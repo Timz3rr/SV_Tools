@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Angelman / Prader-Willi — SV Tools</title>
+  <link rel="stylesheet" href="../../style.css">
+  <style>
+    /* ── Sélects larges ── */
+    .wide-select { max-width: 480px; }
+
+    /* ── Bande de référence (Southern) ── */
+    .band-visual {
+      display: flex;
+      align-items: flex-end;
+      gap: .6rem;
+      margin: .6rem 0 .4rem;
+    }
+    .band {
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .7rem;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: .04em;
+    }
+    .band-mat { background: #0d6efd; width: 52px; height: 18px; }
+    .band-pat { background: #198754; width: 52px; height: 10px; }
+    .band-absent { opacity: .15; }
+
+    /* ── Statuts diagnostics ── */
+    .status-possible   { background: #d1e7dd; color: #0a3622; font-weight: 700; font-size: .78rem; }
+    .status-impossible { background: #f8d7da; color: #58151c; font-weight: 700; font-size: .78rem; }
+    .status-ambiguous  { background: #fff3cd; color: #664d03; font-weight: 700; font-size: .78rem; }
+
+    /* ── Carte diagnostic principal ── */
+    .diagnosis-main {
+      border-left: 4px solid var(--accent);
+      padding: .9rem 1.2rem;
+      background: var(--surface);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      margin-bottom: .75rem;
+    }
+    .diagnosis-main.confidence-high   { border-color: #198754; }
+    .diagnosis-main.confidence-medium { border-color: #ffc107; }
+    .diagnosis-main.confidence-low    { border-color: #adb5bd; }
+    .diagnosis-name { font-size: 1.1rem; font-weight: 700; margin-bottom: .3rem; }
+    .confidence-badge {
+      display: inline-block;
+      font-size: .72rem;
+      font-weight: 700;
+      padding: .15rem .5rem;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .confidence-high   { background: #d1e7dd; color: #0a3622; }
+    .confidence-medium { background: #fff3cd; color: #664d03; }
+    .confidence-low    { background: #f8f9fa; color: var(--text-muted); border: 1px solid var(--border); }
+
+    /* ── Warnings ── */
+    .warning-box {
+      background: #fff3cd;
+      border-left: 3px solid #ffc107;
+      padding: .55rem .85rem;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      font-size: .85rem;
+      color: #664d03;
+      margin-bottom: .5rem;
+    }
+
+    details > summary {
+      cursor: pointer;
+      font-size: .875rem;
+      color: var(--accent);
+      list-style: none;
+      padding: .3rem 0;
+      user-select: none;
+    }
+    details > summary::before { content: "▶  "; font-size: .7rem; }
+    details[open] > summary::before { content: "▼  "; }
+    details > summary:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="nav-brand">🧬 SV Tools</span>
+  <a href="../../index.html">Accueil</a>
+  <a href="../../tests/run-tests.html">Tests</a>
+</nav>
+
+<main>
+  <h1>Angelman / Prader-Willi</h1>
+  <p class="page-subtitle">
+    Interprétation du Southern blot de méthylation et des microsatellites de la région 15q11-q13.<br>
+    Identifie le mécanisme moléculaire parmi les 7 diagnostics connus.
+  </p>
+
+  <!-- Boutons d'exemple -->
+  <div class="btn-row" style="flex-wrap:wrap;align-items:center">
+    <select id="example-select" style="max-width:320px">
+      <option value="1">Cas 1 — Angelman : mutation ponctuelle UBE3A</option>
+      <option value="2">Cas 2 — Angelman : disomie uniparentale paternelle</option>
+      <option value="3">Cas 3 — Angelman : délétion maternelle</option>
+      <option value="4">Cas 4 — Angelman : erreur d'empreinte maternelle</option>
+      <option value="5">Cas 5 — Prader-Willi : disomie uniparentale maternelle</option>
+      <option value="6">Cas 6 — Prader-Willi : délétion paternelle</option>
+      <option value="7">Cas 7 — Prader-Willi : erreur d'empreinte paternelle</option>
+      <option value="8">Cas 8 — Angelman : microsatellite non informatif</option>
+    </select>
+    <button class="btn btn-example" onclick="loadExample()">📋 Charger exemple</button>
+  </div>
+
+  <!-- ① Suspicion clinique ───────────────────────────────────────────────── -->
+  <div class="card">
+    <h2>① Suspicion clinique</h2>
+    <div class="input-group">
+      <label for="clinical-suspicion">Syndrome suspecté</label>
+      <select id="clinical-suspicion" class="wide-select">
+        <option value="Angelman">Angelman</option>
+        <option value="Prader-Willi">Prader-Willi</option>
+        <option value="unknown">Inconnu / non précisé</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- ② Southern blot ────────────────────────────────────────────────────── -->
+  <div class="card">
+    <h2>② Southern blot de méthylation</h2>
+    <p class="text-muted" style="font-size:.85rem;margin-bottom:.6rem">
+      Bande <strong>4,2 kb</strong> = allèle maternel méthylé (MAT) &nbsp;·&nbsp;
+      Bande <strong>0,9 kb</strong> = allèle paternel non méthylé (PAT)
+    </p>
+    <div class="input-group">
+      <label for="southern">Résultat observé</label>
+      <select id="southern" class="wide-select" onchange="updateBandVisual()">
+        <option value="normal">Normal — MAT (4,2 kb) + PAT (0,9 kb) présentes</option>
+        <option value="mat_absent_pat_only">MAT absente — PAT (0,9 kb) seule → profil Angelman</option>
+        <option value="pat_absent_mat_only">PAT absente — MAT (4,2 kb) seule → profil Prader-Willi</option>
+        <option value="unknown">Inconnu / non disponible</option>
+      </select>
+    </div>
+    <!-- Représentation visuelle des bandes -->
+    <div class="band-visual" id="band-visual">
+      <div>
+        <div class="text-muted" style="font-size:.7rem;margin-bottom:.25rem">4,2 kb</div>
+        <div class="band band-mat" id="band-mat">MAT</div>
+      </div>
+      <div>
+        <div class="text-muted" style="font-size:.7rem;margin-bottom:.25rem">0,9 kb</div>
+        <div class="band band-pat" id="band-pat">PAT</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ③ Microsatellites région critique ──────────────────────────────────── -->
+  <div class="card">
+    <h2>③ Microsatellites — région critique 15q11-q13</h2>
+    <div class="input-group">
+      <label for="critical-micro">Allèles observés chez l'enfant</label>
+      <select id="critical-micro" class="wide-select">
+        <option value="maternal_and_paternal">Maternel + paternel présents</option>
+        <option value="paternal_only">Paternel uniquement</option>
+        <option value="maternal_only">Maternel uniquement</option>
+        <option value="non_informative">Non informatif (allèles parentaux de même taille)</option>
+        <option value="unknown">Inconnu / non disponible</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- ④ Microsatellites hors région critique ─────────────────────────────── -->
+  <div class="card">
+    <h2>④ Microsatellites — hors région critique (chromosome 15)</h2>
+    <div class="input-group">
+      <label for="outside-micro">Allèles observés chez l'enfant</label>
+      <select id="outside-micro" class="wide-select">
+        <option value="maternal_and_paternal">Maternel + paternel présents</option>
+        <option value="paternal_only">Paternel uniquement</option>
+        <option value="maternal_only">Maternel uniquement</option>
+        <option value="non_informative">Non informatif (allèles parentaux de même taille)</option>
+        <option value="unknown">Inconnu / non disponible</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Action ────────────────────────────────────────────────────────────── -->
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="calculate()">▶ Interpréter</button>
+  </div>
+
+  <div id="error-area" class="hidden"></div>
+  <div id="results-area" class="hidden"></div>
+
+</main>
+
+<script src="logic.js"></script>
+<script src="ui.js"></script>
+</body>
+</html>
