@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Distances génétiques — SV Tools</title>
+  <link rel="stylesheet" href="../../style.css">
+  <style>
+    /* ── Tableau de définition des gènes ── */
+    .gene-input { width: 100%; min-width: 75px; }
+    table td:first-child { font-size: .8rem; font-weight: 700; color: var(--text-muted); }
+
+    /* ── Carte génétique linéaire ── */
+    .map-chain {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: .3rem;
+      margin-bottom: .75rem;
+    }
+    .map-chain input[type="text"]   { width: 90px; }
+    .map-chain input[type="number"] { width: 58px; text-align: center; }
+    .map-chain .map-link {
+      display: flex;
+      align-items: center;
+      gap: .3rem;
+      color: var(--text-muted);
+      font-size: .8rem;
+    }
+    .map-chain .map-dash { letter-spacing: -.05em; }
+
+    /* ── Haplotypes ── */
+    .haplotype-row {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      margin-bottom: .5rem;
+    }
+    .chr-label {
+      font-size: .72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--text-muted);
+      margin-top: .5rem;
+      margin-bottom: .2rem;
+    }
+    .haplotype-sep { font-size: 1.1rem; color: var(--text-muted); }
+
+    /* ── Résultats ── */
+    .class-parental    { background: #d1e7dd; color: #0a3622; font-weight: 600; font-size: .8rem; }
+    .class-recombinant { background: #f8d7da; color: #58151c; font-weight: 600; font-size: .8rem; }
+    .class-independent { background: #f8f9fa; color: var(--text-muted); font-weight: 600; font-size: .8rem; }
+
+    details > summary {
+      cursor: pointer;
+      font-size: .875rem;
+      color: var(--accent);
+      user-select: none;
+      list-style: none;
+      padding: .3rem 0;
+    }
+    details > summary::before { content: "▶  "; font-size: .7rem; }
+    details[open] > summary::before { content: "▼  "; }
+    details > summary:hover { text-decoration: underline; }
+    details[open] > summary { margin-bottom: .75rem; }
+    details > div { padding-left: .5rem; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="nav-brand">🧬 SV Tools</span>
+  <a href="../../index.html">Accueil</a>
+  <a href="../../tests/run-tests.html">Tests</a>
+</nav>
+
+<main>
+  <h1>Distances génétiques — Drosophile</h1>
+  <p class="page-subtitle">
+    Croisement-test d'une femelle F1 hétérozygote avec un mâle double récessif.<br>
+    Calcule les proportions attendues pour chaque phénotype (phases cis / trans, gènes indépendants).
+  </p>
+
+  <div class="btn-row">
+    <button class="btn btn-example" onclick="loadExample()">📋 Charger exemple</button>
+  </div>
+
+  <!-- ① Gènes ──────────────────────────────────────────────────────────── -->
+  <div class="card">
+    <h2>① Définir les deux gènes</h2>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>Clé</th>
+            <th>Allèle dominant</th>
+            <th>Phénotype dominant</th>
+            <th>Allèle récessif</th>
+            <th>Phénotype récessif</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Gène 1</td>
+            <td><input type="text" class="gene-input" id="gene-0-key"     placeholder="w"></td>
+            <td><input type="text" class="gene-input" id="gene-0-dom-sym" placeholder="w+"></td>
+            <td><input type="text" class="gene-input" id="gene-0-dom-phe" placeholder="rouge"></td>
+            <td><input type="text" class="gene-input" id="gene-0-rec-sym" placeholder="w−"></td>
+            <td><input type="text" class="gene-input" id="gene-0-rec-phe" placeholder="blanc"></td>
+          </tr>
+          <tr>
+            <td>Gène 2</td>
+            <td><input type="text" class="gene-input" id="gene-1-key"     placeholder="m"></td>
+            <td><input type="text" class="gene-input" id="gene-1-dom-sym" placeholder="m+"></td>
+            <td><input type="text" class="gene-input" id="gene-1-dom-phe" placeholder="aile longue"></td>
+            <td><input type="text" class="gene-input" id="gene-1-rec-sym" placeholder="m−"></td>
+            <td><input type="text" class="gene-input" id="gene-1-rec-phe" placeholder="aile miniature"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ② Distance ───────────────────────────────────────────────────────── -->
+  <div class="card">
+    <h2>② Distance génétique</h2>
+    <div class="input-group" style="max-width:240px">
+      <label for="distance-input">Distance entre les deux gènes</label>
+      <div style="display:flex;align-items:center;gap:.5rem">
+        <input type="number" id="distance-input" min="0" max="100" step="0.5" placeholder="ex. 34">
+        <span>cM</span>
+      </div>
+    </div>
+    <div class="info-box" style="font-size:.82rem;margin-top:.25rem">
+      Distance ≥ 50 cM → gènes traités comme <strong>indépendants</strong> (25 % chacun).
+    </div>
+
+    <details style="margin-top:.9rem">
+      <summary>Calculer depuis une carte à 3 gènes</summary>
+      <div>
+        <p class="text-muted" style="margin-bottom:.7rem;font-size:.85rem">
+          Entre les 3 gènes dans l'ordre de la carte et les distances entre voisins.
+          La distance entre la paire choisie sera calculée par addition des segments intermédiaires.
+        </p>
+
+        <!-- Représentation visuelle de la carte -->
+        <div class="map-chain">
+          <input type="text"   id="map-gene-0"  placeholder="corps">
+          <div class="map-link">
+            <span class="map-dash">───</span>
+            <input type="number" id="map-dist-01" placeholder="30">
+            <span>cM</span>
+            <span class="map-dash">───</span>
+          </div>
+          <input type="text"   id="map-gene-1"  placeholder="ailes">
+          <div class="map-link">
+            <span class="map-dash">───</span>
+            <input type="number" id="map-dist-12" placeholder="26">
+            <span>cM</span>
+            <span class="map-dash">───</span>
+          </div>
+          <input type="text"   id="map-gene-2"  placeholder="yeux">
+        </div>
+
+        <div class="input-group" style="max-width:280px">
+          <label for="map-pair">Paire à analyser</label>
+          <select id="map-pair"></select>
+        </div>
+
+        <button class="btn btn-secondary" onclick="computeGeneMap()">Calculer la distance</button>
+        <div id="map-result" class="mt-2"></div>
+      </div>
+    </details>
+  </div>
+
+  <!-- ③ Génotype F1 ────────────────────────────────────────────────────── -->
+  <div class="card">
+    <h2>③ Génotype de la femelle F1</h2>
+    <p class="text-muted" style="margin-bottom:.75rem;font-size:.875rem">
+      Sélectionne l'allèle porté par chaque chromosome.
+      Les options se mettent à jour automatiquement selon les gènes définis ci-dessus.
+    </p>
+
+    <div class="chr-label">Chromosome 1</div>
+    <div class="haplotype-row">
+      <span class="text-muted" style="min-width:3.2rem;font-size:.85rem">Chr 1 :</span>
+      <select id="h1-g0"></select>
+      <span class="haplotype-sep">·</span>
+      <select id="h1-g1"></select>
+    </div>
+
+    <div class="chr-label">Chromosome 2</div>
+    <div class="haplotype-row">
+      <span class="text-muted" style="min-width:3.2rem;font-size:.85rem">Chr 2 :</span>
+      <select id="h2-g0"></select>
+      <span class="haplotype-sep">·</span>
+      <select id="h2-g1"></select>
+    </div>
+
+    <div id="phase-indicator" class="mt-1"></div>
+  </div>
+
+  <!-- Boutons ──────────────────────────────────────────────────────────── -->
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="calculate()">▶ Calculer</button>
+  </div>
+
+  <!-- Zone d'erreur -->
+  <div id="error-area" class="hidden"></div>
+
+  <!-- Résultats -->
+  <div id="results-area" class="hidden"></div>
+
+</main>
+
+<script src="logic.js"></script>
+<script src="ui.js"></script>
+</body>
+</html>

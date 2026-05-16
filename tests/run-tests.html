@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SV Tools — Tests</title>
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    .test-suite { margin-bottom: 1.5rem; }
+    .test-suite-title {
+      font-weight: 700;
+      font-size: 1rem;
+      margin-bottom: .5rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      font-size: .8rem;
+    }
+    .test-line {
+      display: flex;
+      align-items: baseline;
+      gap: .6rem;
+      padding: .3rem .5rem;
+      border-radius: 4px;
+      font-size: .875rem;
+      font-family: "Courier New", monospace;
+    }
+    .test-line.pass { background: #d1e7dd; color: #0a3622; }
+    .test-line.fail { background: #f8d7da; color: #58151c; }
+    .test-line.error { background: #fff3cd; color: #664d03; }
+    .badge-pass { font-weight: 700; color: #198754; }
+    .badge-fail { font-weight: 700; color: #dc3545; }
+    .badge-error { font-weight: 700; color: #856404; }
+    .summary {
+      font-size: 1rem;
+      font-weight: 600;
+      padding: .75rem 1rem;
+      border-radius: var(--radius);
+      margin-bottom: 1.5rem;
+    }
+    .summary.all-pass { background: #d1e7dd; color: #0a3622; }
+    .summary.has-fail  { background: #f8d7da; color: #58151c; }
+    .summary.empty     { background: #f8f9fa; color: var(--text-muted); }
+    .error-detail {
+      font-size: .8rem;
+      margin-top: .2rem;
+      padding-left: 1.4rem;
+      color: #842029;
+      font-family: "Courier New", monospace;
+      white-space: pre-wrap;
+    }
+    #no-tests {
+      color: var(--text-muted);
+      font-size: .9rem;
+      margin-top: .5rem;
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="nav-brand">🧬 SV Tools</span>
+  <a href="../index.html">Accueil</a>
+  <a href="run-tests.html" class="active">Tests</a>
+</nav>
+
+<main>
+  <h1>Résultats des tests</h1>
+  <p class="page-subtitle">Tous les fichiers <code>*.test.js</code> sont chargés et exécutés automatiquement.</p>
+
+  <div id="summary" class="summary empty">Chargement…</div>
+  <div id="results"></div>
+  <p id="no-tests" class="hidden">Aucun fichier de test trouvé. Les tests apparaîtront ici une fois les outils implémentés.</p>
+</main>
+
+<script>
+// ─── Mini framework de test ──────────────────────────────────────────────────
+
+const _suites = [];
+let _currentSuite = null;
+
+window.describe = function(name, fn) {
+  _currentSuite = { name, tests: [] };
+  _suites.push(_currentSuite);
+  try { fn(); } catch(e) {
+    _currentSuite.tests.push({ name: '(suite setup)', error: e });
+  }
+  _currentSuite = null;
+};
+
+window.it = function(name, fn) {
+  if (!_currentSuite) {
+    _currentSuite = { name: '(global)', tests: [] };
+    _suites.push(_currentSuite);
+  }
+  try {
+    fn();
+    _currentSuite.tests.push({ name, pass: true });
+  } catch(e) {
+    _currentSuite.tests.push({ name, pass: false, error: e });
+  }
+};
+
+window.expect = function(actual) {
+  return {
+    toBe(expected) {
+      if (actual !== expected)
+        throw new Error(`Expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+    },
+    toEqual(expected) {
+      const a = JSON.stringify(actual), b = JSON.stringify(expected);
+      if (a !== b)
+        throw new Error(`Expected\n  ${b}\ngot\n  ${a}`);
+    },
+    toBeCloseTo(expected, digits = 4) {
+      const delta = Math.pow(10, -digits) / 2;
+      if (Math.abs(actual - expected) >= delta)
+        throw new Error(`Expected ~${expected}, got ${actual}`);
+    },
+    toThrow() {
+      if (typeof actual !== 'function')
+        throw new Error('toThrow requires a function');
+      try { actual(); throw new Error('Did not throw'); }
+      catch(e) { if (e.message === 'Did not throw') throw e; }
+    },
+    toContain(item) {
+      if (!Array.isArray(actual) && typeof actual !== 'string')
+        throw new Error('toContain requires array or string');
+      if (!actual.includes(item))
+        throw new Error(`Expected ${JSON.stringify(actual)} to contain ${JSON.stringify(item)}`);
+    },
+    toBeTruthy() {
+      if (!actual) throw new Error(`Expected truthy, got ${JSON.stringify(actual)}`);
+    },
+    toBeFalsy() {
+      if (actual) throw new Error(`Expected falsy, got ${JSON.stringify(actual)}`);
+    },
+  };
+};
+
+// ─── Configuration des suites de tests ───────────────────────────────────────
+// Pour chaque outil : lister les scripts à précharger (logic.js…) puis le fichier test.
+// Les scripts sont chargés dans l'ordre : preload en premier, test en dernier.
+const TEST_SUITES = [
+  {
+    preload: ['../tools/genetic-distance/logic.js'],
+    test: 'genetic-distance.test.js',
+  },
+  // Ajouter ici les prochains outils :
+  // { preload: ['../tools/mon-outil/logic.js'], test: 'mon-outil.test.js' },
+];
+
+// ─── Chargement dynamique puis rendu ────────────────────────────────────────
+async function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src + '?t=' + Date.now(); // cache-bust
+    s.onload  = resolve;
+    s.onerror = () => reject(new Error(`Impossible de charger : ${src}`));
+    document.head.appendChild(s);
+  });
+}
+
+async function run() {
+  const resultsEl = document.getElementById('results');
+  const summaryEl = document.getElementById('summary');
+  const noTestsEl = document.getElementById('no-tests');
+
+  if (TEST_SUITES.length === 0) {
+    summaryEl.className = 'summary empty';
+    summaryEl.textContent = 'Aucun test enregistré.';
+    noTestsEl.classList.remove('hidden');
+    return;
+  }
+
+  // Pour chaque suite : charger les préalables (logic.js…) puis le fichier de test
+  for (const suite of TEST_SUITES) {
+    for (const dep of (suite.preload || [])) {
+      try { await loadScript(dep); }
+      catch(e) {
+        _suites.push({ name: dep, tests: [{ name: 'chargement de la dépendance', pass: false, error: e }] });
+      }
+    }
+    try { await loadScript(suite.test); }
+    catch(e) {
+      _suites.push({ name: suite.test, tests: [{ name: 'chargement du fichier de test', pass: false, error: e }] });
+    }
+  }
+
+  // Rendu
+  let totalPass = 0, totalFail = 0;
+
+  for (const suite of _suites) {
+    const div = document.createElement('div');
+    div.className = 'test-suite card';
+
+    const title = document.createElement('div');
+    title.className = 'test-suite-title';
+    title.textContent = suite.name;
+    div.appendChild(title);
+
+    for (const t of suite.tests) {
+      const line = document.createElement('div');
+      if (t.error && !t.hasOwnProperty('pass')) {
+        line.className = 'test-line error';
+        line.innerHTML = `<span class="badge-error">ERR</span> ${t.name}`;
+        const detail = document.createElement('div');
+        detail.className = 'error-detail';
+        detail.textContent = t.error.message || String(t.error);
+        div.appendChild(line);
+        div.appendChild(detail);
+        totalFail++;
+      } else if (t.pass) {
+        line.className = 'test-line pass';
+        line.innerHTML = `<span class="badge-pass">✓</span> ${t.name}`;
+        div.appendChild(line);
+        totalPass++;
+      } else {
+        line.className = 'test-line fail';
+        line.innerHTML = `<span class="badge-fail">✗</span> ${t.name}`;
+        const detail = document.createElement('div');
+        detail.className = 'error-detail';
+        detail.textContent = t.error ? (t.error.message || String(t.error)) : 'Échec';
+        div.appendChild(line);
+        div.appendChild(detail);
+        totalFail++;
+      }
+    }
+
+    resultsEl.appendChild(div);
+  }
+
+  const total = totalPass + totalFail;
+  summaryEl.className = 'summary ' + (totalFail > 0 ? 'has-fail' : 'all-pass');
+  summaryEl.textContent = totalFail > 0
+    ? `✗ ${totalFail} test(s) échoué(s) sur ${total}`
+    : `✓ ${totalPass} test(s) passés sur ${total}`;
+}
+
+run();
+</script>
+</body>
+</html>
