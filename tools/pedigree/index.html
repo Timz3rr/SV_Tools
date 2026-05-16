@@ -6,9 +6,8 @@
   <title>Probabilités génétiques — SV Tools</title>
   <link rel="stylesheet" href="../../style.css">
   <style>
-    .prob-input { max-width: 160px; }
+    .prob-input { max-width: 140px; }
 
-    /* Cartes de résultats */
     .result-value {
       font-size: 1.5rem;
       font-weight: 700;
@@ -32,13 +31,72 @@
       font-weight: 700;
     }
 
-    /* Section conditionnelle */
     .section-hidden { display: none; }
 
-    /* Tableau Bayes */
     .bayes-table th { background: var(--surface); font-size: .8rem; }
     .bayes-table td { font-family: "Courier New", monospace; font-size: .85rem; }
     .bayes-row-highlight td { background: var(--highlight); }
+
+    /* Combined risk */
+    .disease-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    @media (max-width: 640px) {
+      .disease-grid { grid-template-columns: 1fr; }
+    }
+    .disease-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+    }
+    .disease-block-title {
+      font-weight: 700;
+      font-size: .9rem;
+      margin-bottom: .75rem;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .disease-block .input-group { margin-bottom: .6rem; }
+    .disease-block label { font-size: .8rem; }
+
+    /* Combination table */
+    .comb-table { width: 100%; border-collapse: collapse; margin-top: .5rem; }
+    .comb-table th {
+      background: var(--surface);
+      font-size: .8rem;
+      padding: .5rem .75rem;
+      text-align: left;
+      border-bottom: 2px solid var(--border);
+    }
+    .comb-table td {
+      padding: .5rem .75rem;
+      border-bottom: 1px solid var(--border);
+      font-family: "Courier New", monospace;
+    }
+    .comb-table .comb-frac {
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--accent);
+    }
+    .comb-table tr:last-child td { border-bottom: none; }
+
+    /* Source badge */
+    .badge-source {
+      display: inline-block;
+      font-size: .7rem;
+      padding: .1rem .4rem;
+      border-radius: 3px;
+      margin-left: .4rem;
+      font-family: sans-serif;
+    }
+    .badge-override  { background: #fff3cd; color: #664d03; }
+    .badge-inferred  { background: #d1e7dd; color: #0a3622; }
+    .badge-phenotype { background: #cfe2ff; color: #084298; }
   </style>
 </head>
 <body>
@@ -53,46 +111,46 @@
   <h1>Probabilités génétiques</h1>
   <p class="page-subtitle">
     Calcul pas-à-pas des risques de transmission et mise à jour bayésienne.<br>
-    X-lié récessif · Autosomique récessif · Autosomique dominant.
+    X-lié récessif · Autosomique récessif · Autosomique dominant · Risque combiné deux maladies.
   </p>
 
-  <!-- Exemples ────────────────────────────────────────────────────────────── -->
+  <!-- Exemples -->
   <div class="btn-row" style="flex-wrap:wrap;align-items:center">
-    <select id="example-select" style="max-width:400px">
+    <select id="example-select" style="max-width:420px">
       <option value="">— Choisir un exemple —</option>
-      <option value="1">Aline × Bob — X-lié récessif (risque 1/8)</option>
-      <option value="2">Kevin × Zoé — Autosomique récessif (risque 1/24)</option>
-      <option value="3">Bayes — Prior 1/2, 1 fils indemne → prochain fils 5/6</option>
+      <option value="xl">X-lié récessif — P(mère)=1/4</option>
+      <option value="ar">AR seul — P(mère)=1/3, P(père)=1/2</option>
+      <option value="bayes">Bayes — prior 1/2, 1 fils indemne → 1/3, prochain 5/6</option>
+      <option value="q61">Q6.1 — Aline × Bob (dal. + cataracte, fils)</option>
+      <option value="q62">Q6.2 — Kevin × Zoé (dal. + cataracte, fils)</option>
     </select>
-    <button class="btn btn-example" onclick="loadExample()">📋 Charger exemple</button>
+    <button class="btn btn-example" onclick="loadExample()">📋 Charger</button>
   </div>
 
-  <!-- ① Type de calcul ────────────────────────────────────────────────────── -->
+  <!-- ① Type -->
   <div class="card">
     <h2>① Type de calcul</h2>
     <div class="input-group">
-      <label for="calc-type">Mode de calcul</label>
       <select id="calc-type" onchange="updateFields()">
-        <option value="x_linked">X-lié récessif — risque fils atteint / fille conductrice</option>
+        <option value="x_linked">X-lié récessif — risque fils / fille conductrice</option>
         <option value="ar">Autosomique récessif — risque enfant atteint</option>
         <option value="ad">Autosomique dominant — risque enfant atteint</option>
         <option value="bayes">Mise à jour bayésienne (X-lié) — après fils indemnes</option>
+        <option value="combined">Risque combiné — deux maladies indépendantes</option>
       </select>
     </div>
   </div>
 
-  <!-- ② Paramètres ─────────────────────────────────────────────────────────── -->
+  <!-- ② Paramètres -->
   <div class="card" id="params-card">
-    <h2>② Probabilités</h2>
+    <h2>② Paramètres</h2>
 
     <!-- X-lié -->
     <div id="fields-x-linked">
       <div class="input-group">
         <label for="xl-mother-p">P(mère conductrice)</label>
-        <input type="text" id="xl-mother-p" class="prob-input" placeholder="ex. 1/2 ou 0.25">
-        <div class="text-muted" style="font-size:.8rem;margin-top:.2rem">
-          Accepte fractions (1/4) ou décimales (0.25).
-        </div>
+        <input type="text" id="xl-mother-p" class="prob-input" placeholder="ex. 1/2">
+        <div class="text-muted" style="font-size:.8rem;margin-top:.2rem">Fractions (1/4) ou décimales (0.25).</div>
       </div>
     </div>
 
@@ -100,11 +158,11 @@
     <div id="fields-ar" class="section-hidden">
       <div class="input-group">
         <label for="ar-mother-p">P(mère conductrice)</label>
-        <input type="text" id="ar-mother-p" class="prob-input" placeholder="ex. 1/3 ou 0.333">
+        <input type="text" id="ar-mother-p" class="prob-input" placeholder="ex. 1/3">
       </div>
       <div class="input-group" style="margin-top:.75rem">
         <label for="ar-father-p">P(père conducteur)</label>
-        <input type="text" id="ar-father-p" class="prob-input" placeholder="ex. 1/2 ou 0.5">
+        <input type="text" id="ar-father-p" class="prob-input" placeholder="ex. 1/2">
       </div>
     </div>
 
@@ -113,16 +171,13 @@
       <div class="input-group">
         <label for="ad-parent-p">P(parent atteint est hétérozygote Aa)</label>
         <input type="text" id="ad-parent-p" class="prob-input" placeholder="1 si Aa certain">
-        <div class="text-muted" style="font-size:.8rem;margin-top:.2rem">
-          Laisser à 1 si le parent atteint est supposé hétérozygote (cas habituel).
-        </div>
       </div>
     </div>
 
     <!-- Bayes -->
     <div id="fields-bayes" class="section-hidden">
       <div class="input-group">
-        <label for="bayes-prior">P(conductrice) — probabilité a priori</label>
+        <label for="bayes-prior">P(conductrice) — a priori</label>
         <input type="text" id="bayes-prior" class="prob-input" placeholder="ex. 1/2">
       </div>
       <div class="input-group" style="margin-top:.75rem">
@@ -130,9 +185,135 @@
         <input type="number" id="bayes-sons" min="0" max="20" value="1" style="max-width:100px">
       </div>
     </div>
+
+    <!-- Combined -->
+    <div id="fields-combined" class="section-hidden">
+      <p class="text-muted" style="margin-bottom:1rem;font-size:.875rem">
+        Calcule les probabilités pour deux maladies indépendantes (chromosomes différents) chez un même enfant.
+      </p>
+      <div class="disease-grid">
+
+        <!-- Maladie A -->
+        <div class="disease-block">
+          <div class="disease-block-title">Maladie A</div>
+          <div class="input-group">
+            <label>Nom (optionnel)</label>
+            <input type="text" id="ca-name" placeholder="ex. Cataracte" style="max-width:180px">
+          </div>
+          <div class="input-group">
+            <label>Type d'hérédité</label>
+            <select id="ca-type" onchange="updateCombinedFields('a')">
+              <option value="ar">Autosomique récessif</option>
+              <option value="x_linked">X-lié récessif</option>
+              <option value="ad">Autosomique dominant</option>
+            </select>
+          </div>
+          <!-- AR -->
+          <div id="ca-ar">
+            <div class="input-group">
+              <label>Mère — P(porteuse)</label>
+              <input type="text" id="ca-ar-mc" class="prob-input" placeholder="0">
+            </div>
+            <div class="input-group">
+              <label>Mère — P(atteinte)</label>
+              <input type="text" id="ca-ar-ma" class="prob-input" placeholder="0">
+            </div>
+            <div class="input-group">
+              <label>Père — P(porteur)</label>
+              <input type="text" id="ca-ar-fc" class="prob-input" placeholder="0">
+            </div>
+            <div class="input-group">
+              <label>Père — P(atteint)</label>
+              <input type="text" id="ca-ar-fa" class="prob-input" placeholder="0">
+            </div>
+          </div>
+          <!-- XL -->
+          <div id="ca-xl" class="section-hidden">
+            <div class="input-group">
+              <label>Mère — P(conductrice)</label>
+              <input type="text" id="ca-xl-mc" class="prob-input" placeholder="ex. 1/2">
+            </div>
+          </div>
+          <!-- AD -->
+          <div id="ca-ad" class="section-hidden">
+            <div class="input-group">
+              <label>Mère — P(atteinte)</label>
+              <input type="text" id="ca-ad-ma" class="prob-input" placeholder="0">
+            </div>
+            <div class="input-group">
+              <label>Père — P(atteint)</label>
+              <input type="text" id="ca-ad-fa" class="prob-input" placeholder="0">
+            </div>
+          </div>
+        </div>
+
+        <!-- Maladie B -->
+        <div class="disease-block">
+          <div class="disease-block-title">Maladie B</div>
+          <div class="input-group">
+            <label>Nom (optionnel)</label>
+            <input type="text" id="cb-name" placeholder="ex. Daltonisme" style="max-width:180px">
+          </div>
+          <div class="input-group">
+            <label>Type d'hérédité</label>
+            <select id="cb-type" onchange="updateCombinedFields('b')">
+              <option value="ar">Autosomique récessif</option>
+              <option value="x_linked">X-lié récessif</option>
+              <option value="ad">Autosomique dominant</option>
+            </select>
+          </div>
+          <!-- AR -->
+          <div id="cb-ar">
+            <div class="input-group">
+              <label>Mère — P(porteuse)</label>
+              <input type="text" id="cb-ar-mc" class="prob-input" placeholder="0">
+            </div>
+            <div class="input-group">
+              <label>Mère — P(atteinte)</label>
+              <input type="text" id="cb-ar-ma" class="prob-input" placeholder="0">
+            </div>
+            <div class="input-group">
+              <label>Père — P(porteur)</label>
+              <input type="text" id="cb-ar-fc" class="prob-input" placeholder="0">
+            </div>
+            <div class="input-group">
+              <label>Père — P(atteint)</label>
+              <input type="text" id="cb-ar-fa" class="prob-input" placeholder="0">
+            </div>
+          </div>
+          <!-- XL -->
+          <div id="cb-xl" class="section-hidden">
+            <div class="input-group">
+              <label>Mère — P(conductrice)</label>
+              <input type="text" id="cb-xl-mc" class="prob-input" placeholder="ex. 1/2">
+            </div>
+          </div>
+          <!-- AD -->
+          <div id="cb-ad" class="section-hidden">
+            <div class="input-group">
+              <label>Mère — P(atteinte)</label>
+              <input type="text" id="cb-ad-ma" class="prob-input" placeholder="0">
+            </div>
+            <div class="input-group">
+              <label>Père — P(atteint)</label>
+              <input type="text" id="cb-ad-fa" class="prob-input" placeholder="0">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sexe -->
+      <div class="input-group">
+        <label for="comb-sex">Sexe de l'enfant</label>
+        <select id="comb-sex" style="max-width:200px">
+          <option value="male">Garçon</option>
+          <option value="female">Fille</option>
+        </select>
+      </div>
+    </div>
   </div>
 
-  <!-- Action ──────────────────────────────────────────────────────────────── -->
+  <!-- Action -->
   <div class="btn-row">
     <button class="btn btn-primary" onclick="calculate()">▶ Calculer</button>
   </div>
@@ -142,6 +323,8 @@
 
 </main>
 
+<script src="fraction.js"></script>
+<script src="pedigreeEngine.js"></script>
 <script src="pedigreeLogic.js"></script>
 <script src="ui.js"></script>
 </body>
