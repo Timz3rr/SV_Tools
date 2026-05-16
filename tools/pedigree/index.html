@@ -97,6 +97,32 @@
     .badge-override  { background: #fff3cd; color: #664d03; }
     .badge-inferred  { background: #d1e7dd; color: #0a3622; }
     .badge-phenotype { background: #cfe2ff; color: #084298; }
+
+    /* Builder */
+    .builder-wrap { display:flex; flex-direction:column; gap:1rem; }
+    .builder-actions { display:flex; flex-wrap:wrap; gap:.5rem; }
+    .builder-layout { display:grid; grid-template-columns: 280px 1fr; gap:1rem; }
+    @media (max-width:700px) { .builder-layout { grid-template-columns:1fr; } }
+    .builder-sidebar { display:flex; flex-direction:column; gap:.75rem; overflow-y:auto; max-height:70vh; }
+    .builder-section { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:.75rem; }
+    .builder-section-title { font-weight:700; font-size:.8rem; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); margin-bottom:.5rem; }
+    .builder-form { display:flex; flex-wrap:wrap; gap:.4rem; align-items:center; }
+    .builder-form input, .builder-form select { font-size:.8rem; padding:.25rem .4rem; border:1px solid var(--border); border-radius:3px; background:var(--bg); }
+    .builder-phenotypes { display:flex; flex-wrap:wrap; gap:.3rem; margin:.4rem 0; }
+    .builder-phenotypes label { display:flex; align-items:center; gap:.25rem; font-size:.75rem; }
+    .btn-sm { padding:.2rem .5rem; font-size:.8rem; cursor:pointer; border:1px solid var(--border); border-radius:3px; background:var(--surface); }
+    .btn-sm:hover { background:var(--highlight); }
+    .btn-danger { border-color:#dc3545; color:#dc3545; }
+    .btn-danger:hover { background:#f8d7da; }
+    .builder-canvas-wrap { overflow:auto; min-height:300px; border:1px solid var(--border); border-radius:var(--radius); background:#fafafa; }
+    .pedigree-tree { padding:1rem; min-width:400px; }
+    .pedigree-svg { overflow:visible; }
+    .person-node text { font-size:11px; font-family:sans-serif; fill:#333; pointer-events:none; }
+    .person-node:hover .person-shape { filter:brightness(0.9); }
+    .tree-empty { color:var(--text-muted); font-size:.9rem; padding:2rem; text-align:center; }
+    .disease-tag { display:inline-flex; align-items:center; gap:.3rem; font-size:.75rem; padding:.1rem .4rem; border-radius:3px; background:var(--surface); border:1px solid var(--border); margin:.15rem; }
+    .disease-tag .disease-color-dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+    .builder-json-section { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:.75rem; }
   </style>
 </head>
 <body>
@@ -137,6 +163,7 @@
         <option value="ad">Autosomique dominant — risque enfant atteint</option>
         <option value="bayes">Mise à jour bayésienne (X-lié) — après fils indemnes</option>
         <option value="combined">Risque combiné — deux maladies indépendantes</option>
+        <option value="builder">Constructeur d'arbre génétique</option>
       </select>
     </div>
   </div>
@@ -311,11 +338,134 @@
         </select>
       </div>
     </div>
+
+    <!-- Builder -->
+    <div id="fields-builder" class="section-hidden">
+      <div class="builder-wrap">
+
+        <!-- Top action bar -->
+        <div class="builder-actions">
+          <button class="btn" onclick="builderLoadQ6()">📋 Exemple Q6</button>
+          <button class="btn" onclick="builderReset()">🗑 Réinitialiser</button>
+          <button class="btn" onclick="builderExport()">⬇ Exporter JSON</button>
+          <button class="btn" onclick="builderImportOpen()">⬆ Importer JSON</button>
+        </div>
+
+        <!-- Two-column layout: forms left, tree right -->
+        <div class="builder-layout">
+
+          <!-- Left: forms -->
+          <div class="builder-sidebar">
+
+            <!-- Disease form -->
+            <div class="builder-section">
+              <div class="builder-section-title">Maladies</div>
+              <div id="disease-list"></div>
+              <div class="builder-form" id="disease-form">
+                <input id="df-id" placeholder="ID (ex: cat)" style="width:80px">
+                <input id="df-name" placeholder="Nom" style="width:120px">
+                <select id="df-inh">
+                  <option value="autosomal_recessive">AR</option>
+                  <option value="x_linked_recessive">XL réc.</option>
+                  <option value="autosomal_dominant">AD</option>
+                </select>
+                <input id="df-color" type="color" value="#3366cc" style="width:40px;height:28px">
+                <button class="btn-sm" onclick="builderAddDisease()">+ Ajouter</button>
+              </div>
+            </div>
+
+            <!-- Person form -->
+            <div class="builder-section">
+              <div class="builder-section-title">Ajouter un individu</div>
+              <div class="builder-form">
+                <input id="pf-id" placeholder="ID (ex: I1)" style="width:70px">
+                <input id="pf-name" placeholder="Nom (ex: I.1)" style="width:90px">
+                <select id="pf-sex">
+                  <option value="male">♂ Homme</option>
+                  <option value="female">♀ Femme</option>
+                  <option value="unknown">? Inconnu</option>
+                </select>
+                <input id="pf-gen" type="number" min="1" max="10" value="1" style="width:50px" placeholder="Gén.">
+              </div>
+              <div id="pf-phenotypes" class="builder-phenotypes"></div>
+              <button onclick="builderAddPerson()" class="btn-sm">+ Ajouter individu</button>
+            </div>
+
+            <!-- Couple form -->
+            <div class="builder-section">
+              <div class="builder-section-title">Créer un couple</div>
+              <div class="builder-form">
+                <select id="cf-p1" style="width:120px"><option value="">-- Parent 1 --</option></select>
+                <select id="cf-p2" style="width:120px"><option value="">-- Parent 2 --</option></select>
+                <button class="btn-sm" onclick="builderAddCouple()">+ Couple</button>
+              </div>
+            </div>
+
+            <!-- Child form -->
+            <div class="builder-section">
+              <div class="builder-section-title">Ajouter un enfant</div>
+              <div class="builder-form">
+                <select id="chf-couple" style="width:150px"><option value="">-- Couple --</option></select>
+                <input id="chf-id" placeholder="ID" style="width:60px">
+                <input id="chf-name" placeholder="Nom" style="width:90px">
+                <select id="chf-sex">
+                  <option value="male">♂</option>
+                  <option value="female">♀</option>
+                  <option value="unknown">?</option>
+                </select>
+              </div>
+              <div id="chf-phenotypes" class="builder-phenotypes"></div>
+              <button onclick="builderAddChild()" class="btn-sm">+ Ajouter enfant</button>
+            </div>
+
+            <!-- Edit person panel (hidden by default, shown when person clicked) -->
+            <div class="builder-section" id="edit-person-panel" style="display:none">
+              <div class="builder-section-title">Modifier <span id="ep-name-label"></span></div>
+              <div class="builder-form">
+                <input id="ep-name" placeholder="Nom" style="width:120px">
+                <select id="ep-sex">
+                  <option value="male">♂ Homme</option>
+                  <option value="female">♀ Femme</option>
+                  <option value="unknown">? Inconnu</option>
+                </select>
+                <input id="ep-gen" type="number" min="1" max="10" style="width:50px">
+              </div>
+              <div id="ep-phenotypes" class="builder-phenotypes"></div>
+              <div class="builder-form" style="margin-top:.5rem">
+                <button onclick="builderEditPersonSave()" class="btn-sm">💾 Sauvegarder</button>
+                <button onclick="builderRemovePerson()" class="btn-sm btn-danger">🗑 Supprimer</button>
+                <button onclick="document.getElementById('edit-person-panel').style.display='none'" class="btn-sm">✕</button>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Right: tree canvas -->
+          <div class="builder-canvas-wrap">
+            <div id="pedigree-tree" class="pedigree-tree"></div>
+          </div>
+
+        </div>
+
+        <!-- JSON area -->
+        <div class="builder-json-section" id="builder-json-section" style="display:none">
+          <div class="builder-section-title">JSON exporté</div>
+          <textarea id="pedigree-json-text" rows="12" style="width:100%;font-family:monospace;font-size:.8rem"></textarea>
+          <div class="btn-row">
+            <button class="btn" onclick="builderImportFromTextarea()">⬆ Charger ce JSON</button>
+            <button class="btn" onclick="builderDownloadJSON()">⬇ Télécharger</button>
+            <button class="btn" onclick="document.getElementById('builder-json-section').style.display='none'">✕ Fermer</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
   </div>
 
   <!-- Action -->
   <div class="btn-row">
-    <button class="btn btn-primary" onclick="calculate()">▶ Calculer</button>
+    <button id="calc-button" class="btn btn-primary" onclick="calculate()">▶ Calculer</button>
   </div>
 
   <div id="error-area" class="hidden"></div>
@@ -326,6 +476,9 @@
 <script src="fraction.js"></script>
 <script src="pedigreeEngine.js"></script>
 <script src="pedigreeLogic.js"></script>
+<script src="pedigreeBuilder.js"></script>
+<script src="pedigreeRenderer.js"></script>
+<script src="pedigreeExamples.js"></script>
 <script src="ui.js"></script>
 </body>
 </html>

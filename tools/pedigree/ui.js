@@ -85,7 +85,15 @@ function updateFields() {
   $('fields-ad').classList.toggle('section-hidden',       type !== 'ad');
   $('fields-bayes').classList.toggle('section-hidden',    type !== 'bayes');
   $('fields-combined').classList.toggle('section-hidden', type !== 'combined');
+  $('fields-builder').classList.toggle('section-hidden',  type !== 'builder');
+  // Hide/show the calculate button
+  var calcBtn = $('calc-button');
+  if (calcBtn) calcBtn.style.display = (type === 'builder') ? 'none' : '';
   clearResults();
+  // Render builder tree when switching to builder mode
+  if (type === 'builder') {
+    builderRender();
+  }
 }
 
 function updateCombinedFields(ab) {
@@ -430,4 +438,240 @@ document.addEventListener('DOMContentLoaded', function() {
   updateFields();
   updateCombinedFields('a');
   updateCombinedFields('b');
+  // Hook up builder onChange
+  if (typeof PedigreeBuilder !== 'undefined') {
+    PedigreeBuilder.onChange(function() {
+      if ($('calc-type').value === 'builder') {
+        builderRender();
+      }
+    });
+  }
 });
+
+// ─── Builder ──────────────────────────────────────────────────────────────────
+
+var _editingPersonId = null;
+
+function builderRender() {
+  if (typeof PedigreeRenderer === 'undefined' || typeof PedigreeBuilder === 'undefined') return;
+  PedigreeRenderer.render(PedigreeBuilder.getState(), 'pedigree-tree');
+  builderRefreshSelects();
+}
+
+function builderRefreshSelects() {
+  var state = PedigreeBuilder.getState();
+
+  // Refresh person selects
+  var options = '<option value="">--</option>' +
+    Object.values(state.people).map(function(p) {
+      return '<option value="' + p.id + '">' + p.name + '</option>';
+    }).join('');
+  $('cf-p1').innerHTML = options;
+  $('cf-p2').innerHTML = options;
+
+  // Refresh couple select
+  var coupleOptions = '<option value="">-- Couple --</option>' +
+    state.couples.map(function(c) {
+      var p1 = state.people[c.parents[0]];
+      var p2 = state.people[c.parents[1]];
+      return '<option value="' + c.id + '">' +
+        (p1 ? p1.name : c.parents[0]) + ' × ' + (p2 ? p2.name : (c.parents[1] || '?')) + '</option>';
+    }).join('');
+  $('chf-couple').innerHTML = coupleOptions;
+
+  // Refresh disease list display
+  var diseaseListEl = $('disease-list');
+  if (diseaseListEl) {
+    diseaseListEl.innerHTML = Object.entries(state.diseases).map(function(entry) {
+      var id = entry[0], d = entry[1];
+      var inhLabel = d.inheritance
+        .replace('autosomal_recessive', 'AR réc.')
+        .replace('x_linked_recessive', 'XL réc.')
+        .replace('autosomal_dominant', 'AD dom.');
+      return '<div class="disease-tag">' +
+        '<span class="disease-color-dot" style="background:' + d.color + '"></span>' +
+        d.name + ' <small>(' + id + ', ' + inhLabel + ')</small>' +
+        '<button class="btn-sm btn-danger" onclick="builderRemoveDisease(\'' + id + '\')" style="margin-left:.3rem;padding:.05rem .3rem;font-size:.7rem">×</button>' +
+        '</div>';
+    }).join('');
+  }
+
+  // Refresh phenotype inputs for person/child forms
+  builderRefreshPhenotypeInputs('pf-phenotypes', 'pf-ph-');
+  builderRefreshPhenotypeInputs('chf-phenotypes', 'chf-ph-');
+}
+
+function builderRefreshPhenotypeInputs(containerId, prefix) {
+  var state = PedigreeBuilder.getState();
+  var el = $(containerId);
+  if (!el) return;
+  var diseaseIds = Object.keys(state.diseases);
+  if (!diseaseIds.length) { el.innerHTML = ''; return; }
+  el.innerHTML = diseaseIds.map(function(dId) {
+    var d = state.diseases[dId];
+    return '<label><span style="color:' + d.color + '">●</span>&nbsp;' + d.name + ':' +
+      '<select id="' + prefix + dId + '" style="font-size:.75rem;padding:.15rem">' +
+        '<option value="unknown">?</option>' +
+        '<option value="unaffected">sain</option>' +
+        '<option value="carrier">porteur</option>' +
+        '<option value="affected">atteint</option>' +
+      '</select></label>';
+  }).join('');
+}
+
+function builderAddDisease() {
+  try {
+    var id    = $('df-id').value.trim();
+    var name  = $('df-name').value.trim();
+    var inh   = $('df-inh').value;
+    var color = $('df-color').value;
+    if (!id || !name) throw new Error('ID et nom requis.');
+    PedigreeBuilder.addDisease(id, name, inh, color);
+    $('df-id').value = ''; $('df-name').value = '';
+  } catch(e) { alert(e.message); }
+}
+
+function builderRemoveDisease(id) {
+  if (confirm('Supprimer la maladie "' + id + '" ?')) PedigreeBuilder.removeDisease(id);
+}
+
+function builderAddPerson() {
+  try {
+    var id   = $('pf-id').value.trim();
+    var name = $('pf-name').value.trim() || id;
+    var sex  = $('pf-sex').value;
+    var gen  = parseInt($('pf-gen').value) || 1;
+    var phenotypes = builderCollectPhenotypes('pf-ph-');
+    PedigreeBuilder.addPerson({ id: id || undefined, name: name, sex: sex, generation: gen, phenotypes: phenotypes });
+    $('pf-id').value = ''; $('pf-name').value = '';
+  } catch(e) { alert(e.message); }
+}
+
+function builderCollectPhenotypes(prefix) {
+  var state = PedigreeBuilder.getState();
+  var ph = {};
+  Object.keys(state.diseases).forEach(function(dId) {
+    var el = $(prefix + dId);
+    if (el) ph[dId] = el.value;
+  });
+  return ph;
+}
+
+function builderAddCouple() {
+  try {
+    var p1 = $('cf-p1').value, p2 = $('cf-p2').value;
+    if (!p1 || !p2 || p1 === p2) throw new Error('Sélectionnez deux individus différents.');
+    PedigreeBuilder.addCouple(p1, p2);
+  } catch(e) { alert(e.message); }
+}
+
+function builderAddChild() {
+  try {
+    var coupleId = $('chf-couple').value;
+    var id   = $('chf-id').value.trim();
+    var name = $('chf-name').value.trim() || id;
+    var sex  = $('chf-sex').value;
+    var state = PedigreeBuilder.getState();
+    var couple = state.couples.find(function(c) { return c.id === coupleId; });
+    if (!couple) throw new Error('Sélectionnez un couple.');
+    // Determine child generation = max(parents gen) + 1
+    var parentGens = couple.parents.map(function(pid) {
+      return (state.people[pid] && state.people[pid].generation) || 1;
+    });
+    var childGen = Math.max.apply(null, parentGens) + 1;
+    var phenotypes = builderCollectPhenotypes('chf-ph-');
+    PedigreeBuilder.addNewChild(coupleId, { id: id || undefined, name: name, sex: sex, generation: childGen, phenotypes: phenotypes });
+    $('chf-id').value = ''; $('chf-name').value = '';
+  } catch(e) { alert(e.message); }
+}
+
+// Click on person in tree → open edit panel
+window.PedigreeUI = {
+  onPersonClick: function(personId) {
+    var state = PedigreeBuilder.getState();
+    var p = state.people[personId];
+    if (!p) return;
+    _editingPersonId = personId;
+    $('ep-name-label').textContent = p.name;
+    $('ep-name').value = p.name;
+    $('ep-sex').value  = p.sex;
+    $('ep-gen').value  = p.generation;
+    // Render phenotype selects with current values
+    var diseaseIds = Object.keys(state.diseases);
+    $('ep-phenotypes').innerHTML = diseaseIds.map(function(dId) {
+      var d = state.diseases[dId];
+      var val = (p.phenotypes && p.phenotypes[dId]) || 'unknown';
+      return '<label><span style="color:' + d.color + '">●</span>&nbsp;' + d.name + ':' +
+        '<select id="ep-ph-' + dId + '" style="font-size:.75rem;padding:.15rem">' +
+          ['unknown', 'unaffected', 'carrier', 'affected'].map(function(s) {
+            return '<option value="' + s + '"' + (val === s ? ' selected' : '') + '>' +
+              ({ unknown: '?', unaffected: 'sain', carrier: 'porteur', affected: 'atteint' }[s]) +
+              '</option>';
+          }).join('') +
+        '</select></label>';
+    }).join('');
+    $('edit-person-panel').style.display = 'block';
+  }
+};
+
+function builderEditPersonSave() {
+  if (!_editingPersonId) return;
+  var state = PedigreeBuilder.getState();
+  var ph = {};
+  Object.keys(state.diseases).forEach(function(dId) {
+    var el = $('ep-ph-' + dId);
+    if (el) ph[dId] = el.value;
+  });
+  PedigreeBuilder.editPerson(_editingPersonId, {
+    name:       $('ep-name').value.trim(),
+    sex:        $('ep-sex').value,
+    generation: parseInt($('ep-gen').value) || 1,
+    phenotypes: ph,
+  });
+  $('edit-person-panel').style.display = 'none';
+}
+
+function builderRemovePerson() {
+  if (!_editingPersonId) return;
+  if (confirm('Supprimer "' + _editingPersonId + '" ?')) {
+    PedigreeBuilder.removePerson(_editingPersonId);
+    $('edit-person-panel').style.display = 'none';
+    _editingPersonId = null;
+  }
+}
+
+function builderExport() {
+  $('pedigree-json-text').value = PedigreeBuilder.exportJSON();
+  $('builder-json-section').style.display = 'block';
+  $('builder-json-section').scrollIntoView({ behavior: 'smooth' });
+}
+
+function builderImportOpen() {
+  $('pedigree-json-text').value = PedigreeBuilder.exportJSON();
+  $('builder-json-section').style.display = 'block';
+}
+
+function builderImportFromTextarea() {
+  try {
+    var json = $('pedigree-json-text').value;
+    PedigreeBuilder.importJSON(json);
+    alert('Arbre importé avec succès !');
+  } catch(e) { alert('JSON invalide : ' + e.message); }
+}
+
+function builderDownloadJSON() {
+  var json = PedigreeBuilder.exportJSON();
+  var blob = new Blob([json], { type: 'application/json' });
+  var url  = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = 'pedigree.json'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function builderLoadQ6() {
+  PedigreeBuilder.importJSON(PedigreeExamples.Q6);
+}
+
+function builderReset() {
+  if (confirm('Réinitialiser l\'arbre ?')) PedigreeBuilder.reset();
+}
