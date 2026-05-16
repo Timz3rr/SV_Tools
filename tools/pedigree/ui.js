@@ -499,6 +499,9 @@ function builderRefreshSelects() {
   // Refresh phenotype inputs for person/child forms
   builderRefreshPhenotypeInputs('pf-phenotypes', 'pf-ph-');
   builderRefreshPhenotypeInputs('chf-phenotypes', 'chf-ph-');
+
+  // Refresh risk calculator and bayes selects
+  rcRefreshSelects();
 }
 
 function builderRefreshPhenotypeInputs(containerId, prefix) {
@@ -674,4 +677,248 @@ function builderLoadQ6() {
 
 function builderReset() {
   if (confirm('Réinitialiser l\'arbre ?')) PedigreeBuilder.reset();
+}
+
+// ─── Risk Calculator (Builder) ────────────────────────────────────────────────
+
+function rcRefreshSelects() {
+  var state = PedigreeBuilder ? PedigreeBuilder.getState() : null;
+  if (!state) return;
+  var people = Object.values(state.people);
+  var pOpts = '<option value="">--</option>' +
+    people.map(function(p) {
+      return '<option value="' + p.id + '">' + p.name + '</option>';
+    }).join('');
+  var rcP1 = $('rc-p1'), rcP2 = $('rc-p2'), btMother = $('bt-mother');
+  if (rcP1) rcP1.innerHTML = pOpts;
+  if (rcP2) rcP2.innerHTML = pOpts;
+  if (btMother) btMother.innerHTML = pOpts;
+
+  var diseases = Object.entries(state.diseases);
+  var dOpts = '<option value="">-- Maladie --</option>' +
+    diseases.map(function(e) {
+      return '<option value="' + e[0] + '">' + e[1].name + '</option>';
+    }).join('');
+  var dOptsOpt = '<option value="">-- (aucune) --</option>' +
+    diseases.map(function(e) {
+      return '<option value="' + e[0] + '">' + e[1].name + '</option>';
+    }).join('');
+  var rcDA = $('rc-dA'), rcDB = $('rc-dB');
+  if (rcDA) rcDA.innerHTML = dOpts;
+  if (rcDB) rcDB.innerHTML = dOptsOpt;
+
+  var btDisease = $('bt-disease');
+  if (btDisease) {
+    btDisease.innerHTML = '<option value="">-- Maladie XL --</option>' +
+      diseases.filter(function(e) { return e[1].inheritance === 'x_linked_recessive'; })
+        .map(function(e) { return '<option value="' + e[0] + '">' + e[1].name + '</option>'; })
+        .join('');
+  }
+}
+
+function rcLoadQ61() {
+  var state = PedigreeBuilder.getState();
+  if (!state.people['Aline'] || !state.people['Bob']) {
+    alert('Chargez d\'abord l\'exemple Q6.');
+    return;
+  }
+  $('rc-p1').value = 'Aline';
+  $('rc-p2').value = 'Bob';
+  $('rc-sex').value = 'male';
+  $('rc-dA').value = 'cataract';
+  $('rc-dB').value = 'colorblindness';
+  $('rc-ov-dA').value = '';
+  $('rc-ov-dB').value = '';
+  $('rc-result').innerHTML = '';
+}
+
+function rcLoadQ62() {
+  var state = PedigreeBuilder.getState();
+  if (!state.people['Kevin'] || !state.people['Zoe']) {
+    alert('Chargez d\'abord l\'exemple Q6.');
+    return;
+  }
+  $('rc-p1').value = 'Kevin';
+  $('rc-p2').value = 'Zoe';
+  $('rc-sex').value = 'male';
+  $('rc-dA').value = 'cataract';
+  $('rc-dB').value = 'colorblindness';
+  $('rc-ov-dA').value = '';
+  $('rc-ov-dB').value = '';
+  $('rc-result').innerHTML = '';
+}
+
+function rcCalculate() {
+  var resultEl = $('rc-result');
+  try {
+    var state    = PedigreeBuilder.getState();
+    var p1Id     = $('rc-p1').value;
+    var p2Id     = $('rc-p2').value;
+    var childSex = $('rc-sex').value;
+    var dAId     = $('rc-dA').value;
+    var dBId     = $('rc-dB').value;
+
+    if (!p1Id || !p2Id) throw new Error('Sélectionnez deux parents.');
+    if (p1Id === p2Id)  throw new Error('Les deux parents doivent être différents.');
+    if (!dAId)          throw new Error('Sélectionnez au moins une maladie.');
+
+    var diseases = dBId ? [dAId, dBId] : [dAId];
+
+    // Check riskOverrides first
+    var ovKey = [p1Id, p2Id].sort().join('_') + '_' + childSex;
+    var ov    = state.riskOverrides && state.riskOverrides[ovKey];
+    var result, source;
+
+    if (ov) {
+      source = 'override manuel';
+      var childRisks = {};
+      diseases.forEach(function(dId) { childRisks[dId] = ov[dId] || '?'; });
+      result = { childRisks: childRisks, combined: null, explanationSteps: ['Valeurs issues d\'un override manuel du pedigree.'] };
+      if (diseases.length === 2 && ov[dAId] && ov[dBId]) {
+        var combined = PedigreeEngine.combineChildRisks({
+          riskA:  ov[dAId],
+          riskB:  ov[dBId],
+          labelA: state.diseases[dAId] ? state.diseases[dAId].name : dAId,
+          labelB: state.diseases[dBId] ? state.diseases[dBId].name : dBId,
+        });
+        result.combined = combined;
+        result.explanationSteps = combined.explanation || result.explanationSteps;
+      }
+    } else {
+      source = 'calculé automatiquement';
+      result = PedigreeEngine.solvePedigreeQuestion(state, {
+        type:     'future_child_combined_risk',
+        parents:  [p1Id, p2Id],
+        childSex: childSex,
+        diseases: diseases,
+      });
+    }
+
+    // Apply manual field overrides if filled
+    var ovDA = ($('rc-ov-dA').value || '').trim();
+    var ovDB = ($('rc-ov-dB').value || '').trim();
+    if (ovDA || ovDB) {
+      source = 'override manuel (champ)';
+      if (ovDA) result.childRisks[dAId] = ovDA;
+      if (ovDB && dBId) result.childRisks[dBId] = ovDB;
+      if (diseases.length === 2 && result.childRisks[dAId] && result.childRisks[dBId]) {
+        result.combined = PedigreeEngine.combineChildRisks({
+          riskA:  result.childRisks[dAId],
+          riskB:  result.childRisks[dBId],
+          labelA: state.diseases[dAId] ? state.diseases[dAId].name : dAId,
+          labelB: state.diseases[dBId] ? state.diseases[dBId].name : dBId,
+        });
+      }
+    }
+
+    rcRenderResult(result, state, diseases, source);
+  } catch(e) {
+    resultEl.innerHTML = '<div class="error-box">' + e.message + '</div>';
+  }
+}
+
+function rcRenderResult(result, state, diseases, source) {
+  var resultEl = $('rc-result');
+  var dAId = diseases[0], dBId = diseases[1];
+  var nameA = state.diseases[dAId] ? state.diseases[dAId].name : dAId;
+  var nameB = dBId && state.diseases[dBId] ? state.diseases[dBId].name : (dBId || '');
+  var badgeCls = source.indexOf('override') !== -1 ? 'badge-override' : 'badge-inferred';
+  var badge = '<span class="badge-source ' + badgeCls + '">' + source + '</span>';
+
+  var html = '<div style="font-size:.85rem">';
+  html += '<div style="margin-bottom:.4rem"><b>Risques individuels</b> ' + badge + '</div>';
+  diseases.forEach(function(dId) {
+    var name = state.diseases[dId] ? state.diseases[dId].name : dId;
+    var val  = result.childRisks[dId] || '?';
+    html += '<div class="result-row"><span class="result-label">P(' + name + ')</span>';
+    html += '<span class="result-value fraction-highlight">' + val + '</span></div>';
+  });
+
+  if (result.combined && dBId) {
+    html += '<div style="margin-top:.75rem;margin-bottom:.4rem"><b>Combinaisons</b></div>';
+    html += '<table class="comb-table">';
+    html += '<thead><tr><th>Situation</th><th>Probabilité</th></tr></thead><tbody>';
+    var c = result.combined;
+    [
+      { label: nameA + ' <b>et</b> ' + nameB, val: c.both },
+      { label: nameA + ' seul',               val: c.onlyA },
+      { label: nameB + ' seul',               val: c.onlyB },
+      { label: 'Aucune des deux',             val: c.neither },
+    ].forEach(function(r) {
+      html += '<tr><td>' + r.label + '</td><td class="comb-frac">' + r.val + '</td></tr>';
+    });
+    html += '</tbody></table>';
+  }
+
+  if (result.explanationSteps && result.explanationSteps.length) {
+    html += '<details style="margin-top:.5rem"><summary style="cursor:pointer;font-size:.8rem;color:var(--text-muted)">▶ Étapes détaillées</summary>';
+    result.explanationSteps.forEach(function(s) {
+      html += '<div style="font-size:.8rem;padding:.2rem 0;border-bottom:1px solid var(--border)">' + s + '</div>';
+    });
+    html += '</details>';
+  }
+  html += '</div>';
+  resultEl.innerHTML = html;
+}
+
+// ─── Bayes Panel (Builder) ────────────────────────────────────────────────────
+
+function btLoadQ63() {
+  var state = PedigreeBuilder.getState();
+  if (!state.people['III2']) {
+    alert('Chargez d\'abord l\'exemple Q6.');
+    return;
+  }
+  $('bt-mother').value  = 'III2';
+  $('bt-disease').value = 'colorblindness';
+  var p   = state.people['III2'];
+  var ovCb = p.statusOverrides && p.statusOverrides['colorblindness'];
+  $('bt-prior').value = ovCb ? ovCb.carrierProbability : '1/2';
+  $('bt-sons').value  = '1';
+  $('bt-result').innerHTML = '';
+}
+
+function btCalculate() {
+  var resultEl = $('bt-result');
+  try {
+    var prior = ($('bt-prior').value || '').trim();
+    var nSons = parseInt($('bt-sons').value, 10);
+    if (!prior)                    throw new Error('Entrez une probabilité a priori.');
+    if (isNaN(nSons) || nSons < 0) throw new Error('Nombre de fils indemnes invalide.');
+
+    var r = PedigreeEngine.bayesXLinkedAfterUnaffectedSons(prior, nSons);
+
+    var html = '';
+    html += '<div class="result-row"><span class="result-label">P(conductrice) a posteriori</span>';
+    html += '<span class="result-value fraction-highlight">' + r.posteriorCarrierProbability + '</span></div>';
+    html += '<div class="result-row"><span class="result-label">P(prochain fils atteint)</span>';
+    html += '<span class="result-value fraction-highlight">' + r.riskNextSonAffected + '</span></div>';
+    html += '<div class="result-row"><span class="result-label">P(prochain fils indemne)</span>';
+    html += '<span class="result-value fraction-highlight">' + r.riskNextSonUnaffected + '</span></div>';
+
+    // Evolution table
+    if (nSons >= 1) {
+      html += '<table class="comb-table" style="margin-top:.5rem">';
+      html += '<thead><tr><th>Fils indemnes (n)</th><th>P(conductrice)</th><th>P(fils atteint)</th></tr></thead><tbody>';
+      for (var k = 0; k <= nSons; k++) {
+        var rk = PedigreeEngine.bayesXLinkedAfterUnaffectedSons(prior, k);
+        html += '<tr' + (k === nSons ? ' style="background:var(--highlight)"' : '') + '>';
+        html += '<td>' + k + '</td><td>' + rk.posteriorCarrierProbability + '</td><td>' + rk.riskNextSonAffected + '</td>';
+        html += '</tr>';
+      }
+      html += '</tbody></table>';
+    }
+
+    if (r.explanationSteps && r.explanationSteps.length) {
+      html += '<details style="margin-top:.5rem"><summary style="cursor:pointer;font-size:.8rem;color:var(--text-muted)">▶ Étapes détaillées</summary>';
+      r.explanationSteps.forEach(function(s) {
+        html += '<div style="font-size:.8rem;padding:.2rem 0;border-bottom:1px solid var(--border)">' + s + '</div>';
+      });
+      html += '</details>';
+    }
+
+    resultEl.innerHTML = html;
+  } catch(e) {
+    resultEl.innerHTML = '<div class="error-box">' + e.message + '</div>';
+  }
 }

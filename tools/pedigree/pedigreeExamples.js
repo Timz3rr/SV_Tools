@@ -65,6 +65,10 @@
       { id: 'cII2',  parents: ['II3',  'II4'],  children: ['III1'] },
       { id: 'cIII1', parents: ['III1', 'III2'], children: ['Aline', 'Kevin'] },
     ],
+    riskOverrides: {
+      'Aline_Bob_male':  { cataract: '1/8',  colorblindness: '1/2' },
+      'Kevin_Zoe_male':  { cataract: '1/24', colorblindness: '1/4' },
+    },
   };
 
   var PedigreeExamples = { Q6: Q6 };

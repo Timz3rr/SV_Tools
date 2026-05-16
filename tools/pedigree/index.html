@@ -458,6 +458,58 @@
           </div>
         </div>
 
+        <!-- Risk Calculator Panel -->
+        <div class="builder-json-section" id="rc-panel">
+          <div class="builder-section-title">Calculer risque futur enfant</div>
+          <div class="builder-form" style="margin-bottom:.5rem">
+            <select id="rc-p1" style="width:140px"><option value="">-- Parent 1 --</option></select>
+            <select id="rc-p2" style="width:140px"><option value="">-- Parent 2 --</option></select>
+            <select id="rc-sex">
+              <option value="male">♂ Fils</option>
+              <option value="female">♀ Fille</option>
+            </select>
+          </div>
+          <div class="builder-form" style="margin-bottom:.5rem">
+            <select id="rc-dA" style="width:140px"><option value="">-- Maladie A --</option></select>
+            <select id="rc-dB" style="width:160px"><option value="">-- Maladie B (optionnel) --</option></select>
+          </div>
+          <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:.4rem">Surcharge manuelle (si calcul impossible depuis le pedigree) :</div>
+          <div class="builder-form" style="margin-bottom:.5rem">
+            <label style="font-size:.8rem">P(enfant A) :</label>
+            <input id="rc-ov-dA" class="prob-input" placeholder="auto" style="width:70px">
+            <label style="font-size:.8rem">P(enfant B) :</label>
+            <input id="rc-ov-dB" class="prob-input" placeholder="auto" style="width:70px">
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-example" onclick="rcLoadQ61()">📋 Q6.1 (Aline × Bob)</button>
+            <button class="btn btn-example" onclick="rcLoadQ62()">📋 Q6.2 (Kevin × Zoé)</button>
+            <button class="btn btn-primary" onclick="rcCalculate()">▶ Calculer</button>
+          </div>
+          <div id="rc-result" style="margin-top:.75rem"></div>
+        </div>
+
+        <!-- Bayes Panel -->
+        <div class="builder-json-section" id="bt-panel">
+          <div class="builder-section-title">Mise à jour bayésienne (X-lié depuis l'arbre)</div>
+          <div class="builder-form" style="margin-bottom:.5rem">
+            <label style="font-size:.8rem">Mère :</label>
+            <select id="bt-mother" style="width:140px"><option value="">-- Mère --</option></select>
+            <label style="font-size:.8rem">Maladie XL :</label>
+            <select id="bt-disease" style="width:140px"><option value="">-- Maladie XL --</option></select>
+          </div>
+          <div class="builder-form" style="margin-bottom:.5rem">
+            <label style="font-size:.8rem">P(conductrice) a priori :</label>
+            <input id="bt-prior" class="prob-input" placeholder="ex. 1/2" style="width:80px">
+            <label style="font-size:.8rem">Fils indemnes :</label>
+            <input id="bt-sons" type="number" min="0" max="20" value="1" style="width:60px">
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-example" onclick="btLoadQ63()">📋 Q6.3 (III.2)</button>
+            <button class="btn btn-primary" onclick="btCalculate()">▶ Calculer</button>
+          </div>
+          <div id="bt-result" style="margin-top:.75rem"></div>
+        </div>
+
       </div>
     </div>
 

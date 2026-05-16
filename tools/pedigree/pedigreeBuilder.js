@@ -2,7 +2,7 @@
 
 (function(root) {
 
-  var _state = { people: {}, couples: [], diseases: {} };
+  var _state = { people: {}, couples: [], diseases: {}, riskOverrides: {} };
   var _listeners = [];
   var _idCounter = 0;
 
@@ -145,15 +145,30 @@
     var data = (typeof jsonOrString === 'string') ? JSON.parse(jsonOrString) : jsonOrString;
     if (!data || typeof data !== 'object') throw new Error('JSON invalide.');
     _state = {
-      people:   data.people   || {},
-      couples:  data.couples  || [],
-      diseases: data.diseases || {},
+      people:        data.people        || {},
+      couples:       data.couples       || [],
+      diseases:      data.diseases      || {},
+      riskOverrides: data.riskOverrides || {},
     };
     _notify();
   }
 
+  function makeOverrideKey(p1Id, p2Id, childSex) {
+    return [p1Id, p2Id].sort().join('_') + '_' + childSex;
+  }
+
+  function setRiskOverride(p1Id, p2Id, childSex, overrides) {
+    var key = makeOverrideKey(p1Id, p2Id, childSex);
+    if (!overrides || Object.keys(overrides).length === 0) {
+      delete _state.riskOverrides[key];
+    } else {
+      _state.riskOverrides[key] = overrides;
+    }
+    _notify();
+  }
+
   function reset() {
-    _state = { people: {}, couples: [], diseases: {} };
+    _state = { people: {}, couples: [], diseases: {}, riskOverrides: {} };
     _idCounter = 0;
     _notify();
   }
@@ -169,20 +184,22 @@
   // ── Export ───────────────────────────────────────────────────────────────────
 
   var PedigreeBuilder = {
-    addDisease:   addDisease,
-    editDisease:  editDisease,
-    removeDisease:removeDisease,
-    addPerson:    addPerson,
-    editPerson:   editPerson,
-    removePerson: removePerson,
-    addCouple:    addCouple,
-    removeCouple: removeCouple,
-    addNewChild:  addNewChild,
-    exportJSON:   exportJSON,
-    importJSON:   importJSON,
-    reset:        reset,
-    getState:     getState,
-    onChange:     onChange,
+    addDisease:      addDisease,
+    editDisease:     editDisease,
+    removeDisease:   removeDisease,
+    addPerson:       addPerson,
+    editPerson:      editPerson,
+    removePerson:    removePerson,
+    addCouple:       addCouple,
+    removeCouple:    removeCouple,
+    addNewChild:     addNewChild,
+    makeOverrideKey: makeOverrideKey,
+    setRiskOverride: setRiskOverride,
+    exportJSON:      exportJSON,
+    importJSON:      importJSON,
+    reset:           reset,
+    getState:        getState,
+    onChange:        onChange,
   };
 
   if (typeof module !== 'undefined' && module.exports) {
