@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Probabilités génétiques — SV Tools</title>
+  <link rel="stylesheet" href="../../style.css">
+  <style>
+    .prob-input { max-width: 160px; }
+
+    /* Cartes de résultats */
+    .result-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--accent);
+      font-family: "Courier New", monospace;
+    }
+    .result-row {
+      display: flex;
+      align-items: baseline;
+      gap: .75rem;
+      margin-bottom: .5rem;
+    }
+    .result-label { font-size: .9rem; color: var(--text-muted); min-width: 220px; }
+
+    .fraction-highlight {
+      background: var(--highlight);
+      border: 1px solid var(--highlight-border);
+      border-radius: 4px;
+      padding: .1rem .45rem;
+      font-family: "Courier New", monospace;
+      font-weight: 700;
+    }
+
+    /* Section conditionnelle */
+    .section-hidden { display: none; }
+
+    /* Tableau Bayes */
+    .bayes-table th { background: var(--surface); font-size: .8rem; }
+    .bayes-table td { font-family: "Courier New", monospace; font-size: .85rem; }
+    .bayes-row-highlight td { background: var(--highlight); }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="nav-brand">🧬 SV Tools</span>
+  <a href="../../index.html">Accueil</a>
+  <a href="../../tests/run-tests.html">Tests</a>
+</nav>
+
+<main>
+  <h1>Probabilités génétiques</h1>
+  <p class="page-subtitle">
+    Calcul pas-à-pas des risques de transmission et mise à jour bayésienne.<br>
+    X-lié récessif · Autosomique récessif · Autosomique dominant.
+  </p>
+
+  <!-- Exemples ────────────────────────────────────────────────────────────── -->
+  <div class="btn-row" style="flex-wrap:wrap;align-items:center">
+    <select id="example-select" style="max-width:400px">
+      <option value="">— Choisir un exemple —</option>
+      <option value="1">Aline × Bob — X-lié récessif (risque 1/8)</option>
+      <option value="2">Kevin × Zoé — Autosomique récessif (risque 1/24)</option>
+      <option value="3">Bayes — Prior 1/2, 1 fils indemne → prochain fils 5/6</option>
+    </select>
+    <button class="btn btn-example" onclick="loadExample()">📋 Charger exemple</button>
+  </div>
+
+  <!-- ① Type de calcul ────────────────────────────────────────────────────── -->
+  <div class="card">
+    <h2>① Type de calcul</h2>
+    <div class="input-group">
+      <label for="calc-type">Mode de calcul</label>
+      <select id="calc-type" onchange="updateFields()">
+        <option value="x_linked">X-lié récessif — risque fils atteint / fille conductrice</option>
+        <option value="ar">Autosomique récessif — risque enfant atteint</option>
+        <option value="ad">Autosomique dominant — risque enfant atteint</option>
+        <option value="bayes">Mise à jour bayésienne (X-lié) — après fils indemnes</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- ② Paramètres ─────────────────────────────────────────────────────────── -->
+  <div class="card" id="params-card">
+    <h2>② Probabilités</h2>
+
+    <!-- X-lié -->
+    <div id="fields-x-linked">
+      <div class="input-group">
+        <label for="xl-mother-p">P(mère conductrice)</label>
+        <input type="text" id="xl-mother-p" class="prob-input" placeholder="ex. 1/2 ou 0.25">
+        <div class="text-muted" style="font-size:.8rem;margin-top:.2rem">
+          Accepte fractions (1/4) ou décimales (0.25).
+        </div>
+      </div>
+    </div>
+
+    <!-- AR -->
+    <div id="fields-ar" class="section-hidden">
+      <div class="input-group">
+        <label for="ar-mother-p">P(mère conductrice)</label>
+        <input type="text" id="ar-mother-p" class="prob-input" placeholder="ex. 1/3 ou 0.333">
+      </div>
+      <div class="input-group" style="margin-top:.75rem">
+        <label for="ar-father-p">P(père conducteur)</label>
+        <input type="text" id="ar-father-p" class="prob-input" placeholder="ex. 1/2 ou 0.5">
+      </div>
+    </div>
+
+    <!-- AD -->
+    <div id="fields-ad" class="section-hidden">
+      <div class="input-group">
+        <label for="ad-parent-p">P(parent atteint est hétérozygote Aa)</label>
+        <input type="text" id="ad-parent-p" class="prob-input" placeholder="1 si Aa certain">
+        <div class="text-muted" style="font-size:.8rem;margin-top:.2rem">
+          Laisser à 1 si le parent atteint est supposé hétérozygote (cas habituel).
+        </div>
+      </div>
+    </div>
+
+    <!-- Bayes -->
+    <div id="fields-bayes" class="section-hidden">
+      <div class="input-group">
+        <label for="bayes-prior">P(conductrice) — probabilité a priori</label>
+        <input type="text" id="bayes-prior" class="prob-input" placeholder="ex. 1/2">
+      </div>
+      <div class="input-group" style="margin-top:.75rem">
+        <label for="bayes-sons">Nombre de fils indemnes observés</label>
+        <input type="number" id="bayes-sons" min="0" max="20" value="1" style="max-width:100px">
+      </div>
+    </div>
+  </div>
+
+  <!-- Action ──────────────────────────────────────────────────────────────── -->
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="calculate()">▶ Calculer</button>
+  </div>
+
+  <div id="error-area" class="hidden"></div>
+  <div id="results-area" class="hidden"></div>
+
+</main>
+
+<script src="pedigreeLogic.js"></script>
+<script src="ui.js"></script>
+</body>
+</html>

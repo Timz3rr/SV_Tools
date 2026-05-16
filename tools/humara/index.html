@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HUMARA / Inactivation X — SV Tools</title>
+  <link rel="stylesheet" href="../../style.css">
+  <style>
+    .peaks-input { font-family: "Courier New", monospace; letter-spacing: .05em; }
+
+    /* Statut conductrice */
+    .carrier-card {
+      border-radius: var(--radius);
+      padding: .9rem 1.2rem;
+      margin-bottom: .75rem;
+    }
+    .carrier-likely   { background: #d1e7dd; border-left: 4px solid #198754; }
+    .carrier-unlikely { background: #f8d7da; border-left: 4px solid #dc3545; }
+    .carrier-inconclusive { background: #fff3cd; border-left: 4px solid #ffc107; }
+    .carrier-name { font-size: 1.05rem; font-weight: 700; margin-bottom: .2rem; }
+
+    /* Badge inactivation X */
+    .xi-badge {
+      display: inline-block;
+      font-size: .72rem;
+      font-weight: 700;
+      padding: .15rem .5rem;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .xi-random   { background: #cff4fc; color: #055160; }
+    .xi-skewed   { background: #f8d7da; color: #58151c; }
+    .xi-na       { background: #f8f9fa; color: var(--text-muted); border: 1px solid var(--border); }
+
+    .allele-chip {
+      display: inline-block;
+      background: var(--highlight);
+      border: 1px solid var(--highlight-border);
+      border-radius: 4px;
+      padding: .1rem .4rem;
+      font-family: "Courier New", monospace;
+      font-size: .9rem;
+      font-weight: 700;
+      margin: 0 .1rem;
+    }
+    .allele-chip.mutated { background: #f8d7da; border-color: #dc3545; }
+    .allele-chip.safe    { background: #d1e7dd; border-color: #198754; }
+
+    .family-diagram {
+      display: flex;
+      gap: 1.5rem;
+      align-items: center;
+      flex-wrap: wrap;
+      margin: .6rem 0;
+    }
+    .family-member { text-align: center; font-size: .8rem; color: var(--text-muted); }
+    .family-member strong { display: block; font-size: .9rem; color: var(--text); margin-bottom: .2rem; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="nav-brand">🧬 SV Tools</span>
+  <a href="../../index.html">Accueil</a>
+  <a href="../../tests/run-tests.html">Tests</a>
+</nav>
+
+<main>
+  <h1>HUMARA — Inactivation X</h1>
+  <p class="page-subtitle">
+    Analyse du test HUMARA (digestion HpaII + PCR) pour l'étude de l'inactivation X.<br>
+    Identifie l'allèle muté, détermine l'origine parentale et évalue le statut de conductrice.
+  </p>
+
+  <!-- Exemples ────────────────────────────────────────────────────────────── -->
+  <div class="btn-row" style="flex-wrap:wrap;align-items:center">
+    <select id="example-select" style="max-width:400px">
+      <option value="">— Choisir un exemple —</option>
+      <option value="1">Famille 1 · Daltonisme — Thomas (garçon atteint)</option>
+      <option value="2">Famille 1 · Daltonisme — Sophie (fille à analyser)</option>
+      <option value="3">Famille 2 · X-SCID — Lucie (conductrice, sang)</option>
+      <option value="4">Famille 2 · X-SCID — Clara (conductrice, cellules buccales)</option>
+      <option value="5">Famille 2 · X-SCID — Emma (non-conductrice, sang)</option>
+    </select>
+    <button class="btn btn-example" onclick="loadExample()">📋 Charger exemple</button>
+  </div>
+
+  <!-- ① Contexte clinique ──────────────────────────────────────────────────── -->
+  <div class="card">
+    <h2>① Contexte clinique</h2>
+    <div class="input-group">
+      <label for="disease-name">Nom de la maladie</label>
+      <input type="text" id="disease-name" placeholder="ex. Daltonisme, X-SCID…" style="max-width:400px">
+    </div>
+    <div class="input-group" style="margin-top:.75rem">
+      <label>
+        <input type="checkbox" id="affects-lymphocytes">
+        &nbsp;La maladie affecte la viabilité des lymphocytes (ex. X-SCID)
+      </label>
+      <div class="text-muted" style="font-size:.8rem;margin-top:.3rem">
+        Si coché : dans le sang d'une conductrice, l'inactivation X est biaisée vers l'allèle muté.
+      </div>
+    </div>
+  </div>
+
+  <!-- ② Données familiales ─────────────────────────────────────────────────── -->
+  <div class="card">
+    <h2>② Données familiales</h2>
+    <div class="input-group">
+      <label for="mother-peaks">Pics HUMARA de la mère <span class="text-muted">(répétitions CAG, sans HpaII)</span></label>
+      <input type="text" id="mother-peaks" class="peaks-input" placeholder="ex. 12, 16" style="max-width:220px">
+    </div>
+    <div class="input-group" style="margin-top:.75rem">
+      <label for="father-peaks">Pics HUMARA du père <span class="text-muted">(optionnel)</span></label>
+      <input type="text" id="father-peaks" class="peaks-input" placeholder="ex. 14" style="max-width:220px">
+    </div>
+    <div class="input-group" style="margin-top:.75rem">
+      <label for="affected-males-peaks">
+        Allèle(s) maternel(s) des garçons atteints
+        <span class="text-muted">(pic HUMARA sans HpaII, un allèle par garçon atteint)</span>
+      </label>
+      <input type="text" id="affected-males-peaks" class="peaks-input" placeholder="ex. 12  ou  12, 12 si deux garçons atteints" style="max-width:320px">
+      <div class="text-muted" style="font-size:.8rem;margin-top:.2rem">
+        Laissez vide si aucun garçon atteint connu dans la famille.
+      </div>
+    </div>
+  </div>
+
+  <!-- ③ Individu à analyser ───────────────────────────────────────────────── -->
+  <div class="card">
+    <h2>③ Individu à analyser</h2>
+    <div class="input-group">
+      <label for="target-label">Nom / étiquette <span class="text-muted">(optionnel)</span></label>
+      <input type="text" id="target-label" placeholder="ex. Sophie, Fille 1…" style="max-width:260px">
+    </div>
+    <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-top:.75rem">
+      <div class="input-group" style="margin:0">
+        <label for="target-sex">Sexe</label>
+        <select id="target-sex">
+          <option value="female">Féminin</option>
+          <option value="male">Masculin</option>
+        </select>
+      </div>
+      <div class="input-group" style="margin:0">
+        <label for="target-tissue">Tissu analysé</label>
+        <select id="target-tissue">
+          <option value="blood">Sang (lymphocytes)</option>
+          <option value="buccal">Cellules buccales</option>
+        </select>
+      </div>
+    </div>
+    <div class="input-group" style="margin-top:.75rem">
+      <label for="peaks-without">Pics HUMARA <strong>sans</strong> HpaII</label>
+      <input type="text" id="peaks-without" class="peaks-input" placeholder="ex. 12, 14" style="max-width:220px">
+    </div>
+    <div class="input-group" style="margin-top:.75rem">
+      <label for="peaks-with">Pics HUMARA <strong>après</strong> digestion HpaII <span class="text-muted">(optionnel)</span></label>
+      <input type="text" id="peaks-with" class="peaks-input" placeholder="ex. 12  ou laisser vide" style="max-width:220px">
+      <div class="text-muted" style="font-size:.8rem;margin-top:.2rem">
+        Laissez vide si les données HpaII ne sont pas disponibles.
+      </div>
+    </div>
+  </div>
+
+  <!-- Action ──────────────────────────────────────────────────────────────── -->
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="analyse()">▶ Analyser</button>
+  </div>
+
+  <div id="error-area" class="hidden"></div>
+  <div id="results-area" class="hidden"></div>
+
+</main>
+
+<script src="humaraLogic.js"></script>
+<script src="ui.js"></script>
+</body>
+</html>
