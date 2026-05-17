@@ -30,7 +30,9 @@
     return el;
   }
 
-  // Build layout: returns map personId → {cx, cy, slot}
+  // Build layout: returns map personId → {cx, cy}
+  // Uses a bottom-up pass so parents are centered above their children,
+  // which avoids couple drop-lines traversing unrelated nodes.
   function _buildLayout(state) {
     var people  = state.people;
     var couples = state.couples;
@@ -42,49 +44,102 @@
       if (!byGen[g]) byGen[g] = [];
       byGen[g].push(p.id);
     });
+    var gens = Object.keys(byGen).map(Number).sort(function(a, b) { return a - b; });
 
-    // For each generation, order people so couple partners are adjacent
-    var positions = {}; // personId → {cx, cy}
-    var gens = Object.keys(byGen).map(Number).sort(function(a,b){return a-b;});
+    var positions = {};
 
-    gens.forEach(function(gen) {
-      var ids = byGen[gen].slice(); // copy
-      // Build ordered list: pair up partners
-      var ordered = [];
-      var placed  = {};
+    // ── Bottom-up: last generation first ──────────────────────────────────────
+    for (var gi = gens.length - 1; gi >= 0; gi--) {
+      var gen = gens[gi];
+      var cy  = MARGIN + (gen - 1) * ROW_HEIGHT;
+      var ids = byGen[gen].slice();
 
-      // Find couples whose both parents are in this generation
+      // Collect couples whose both parents are in this generation
+      var genCouples = [];
+      var inCouple   = {};
       couples.forEach(function(couple) {
         var p1 = couple.parents[0], p2 = couple.parents[1];
         if (!p2) return;
-        var inGen = ids.indexOf(p1) !== -1 && ids.indexOf(p2) !== -1;
-        if (!inGen) return;
-        if (placed[p1] || placed[p2]) return;
-        // Put female/male first (male left, female right) or just preserve order
-        var person1 = people[p1], person2 = people[p2];
+        if (ids.indexOf(p1) === -1 || ids.indexOf(p2) === -1) return;
+        if (inCouple[p1] || inCouple[p2]) return;
+        inCouple[p1] = inCouple[p2] = true;
+
+        // Convention: male on left, female on right
         var left = p1, right = p2;
-        if (person1 && person2) {
-          if (person1.sex === 'female' && person2.sex === 'male') {
-            left = p2; right = p1;
+        var p1o  = people[p1], p2o = people[p2];
+        if (p1o && p2o && p1o.sex === 'female' && p2o.sex === 'male') {
+          left = p2; right = p1;
+        }
+
+        // Desired left-slot: center this couple above its children (already placed)
+        var desiredSlotL = null;
+        var children = couple.children || [];
+        if (children.length > 0) {
+          var childXs = children
+            .filter(function(cid) { return positions[cid]; })
+            .map(function(cid)    { return positions[cid].cx; });
+          if (childXs.length > 0) {
+            var minX = Math.min.apply(null, childXs);
+            var maxX = Math.max.apply(null, childXs);
+            var midX = (minX + maxX) / 2;
+            // slot such that MARGIN + (slotL + 0.5)*COL_WIDTH ≈ midX
+            desiredSlotL = Math.round((midX - MARGIN - COL_WIDTH / 2) / COL_WIDTH);
+            if (desiredSlotL < 0) desiredSlotL = 0;
           }
         }
-        ordered.push(left);
-        ordered.push(right);
-        placed[left]  = true;
-        placed[right] = true;
+        genCouples.push({ left: left, right: right, desiredSlotL: desiredSlotL });
       });
 
-      // Add remaining (not yet placed)
+      var singles = ids.filter(function(id) { return !inCouple[id]; });
+
+      // Sort: constrained couples first (ascending desired slot), then free couples, then singles
+      genCouples.sort(function(a, b) {
+        if (a.desiredSlotL !== null && b.desiredSlotL !== null) return a.desiredSlotL - b.desiredSlotL;
+        if (a.desiredSlotL !== null) return -1;
+        if (b.desiredSlotL !== null) return 1;
+        return 0;
+      });
+
+      // Assign slots ──────────────────────────────────────────────────────────
+      var occupied    = {}; // slot → true
+      var assignments = {}; // personId → slot
+
+      function pairFits(s) { return !occupied[s] && !occupied[s + 1]; }
+
+      // Constrained couples: place at or after their desired slot
+      genCouples.forEach(function(cg) {
+        if (cg.desiredSlotL === null) return;
+        var s = cg.desiredSlotL;
+        while (!pairFits(s)) s++;
+        occupied[s] = occupied[s + 1] = true;
+        assignments[cg.left]  = s;
+        assignments[cg.right] = s + 1;
+      });
+
+      // Free couples: pack into earliest available pair
+      genCouples.forEach(function(cg) {
+        if (cg.desiredSlotL !== null) return;
+        var s = 0;
+        while (!pairFits(s)) s++;
+        occupied[s] = occupied[s + 1] = true;
+        assignments[cg.left]  = s;
+        assignments[cg.right] = s + 1;
+      });
+
+      // Singles: pack into earliest free slot
+      singles.forEach(function(id) {
+        var s = 0;
+        while (occupied[s]) s++;
+        occupied[s] = true;
+        assignments[id] = s;
+      });
+
+      // Store positions
       ids.forEach(function(id) {
-        if (!placed[id]) ordered.push(id);
+        var slot = assignments[id] !== undefined ? assignments[id] : 0;
+        positions[id] = { cx: MARGIN + slot * COL_WIDTH, cy: cy };
       });
-
-      var cy = MARGIN + (gen - 1) * ROW_HEIGHT;
-      ordered.forEach(function(id, slot) {
-        var cx = MARGIN + slot * COL_WIDTH;
-        positions[id] = { cx: cx, cy: cy, slot: slot, generation: gen };
-      });
-    });
+    }
 
     return positions;
   }

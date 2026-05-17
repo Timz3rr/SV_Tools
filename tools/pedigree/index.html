@@ -378,8 +378,7 @@
             <div class="builder-section">
               <div class="builder-section-title">Ajouter un individu</div>
               <div class="builder-form">
-                <input id="pf-id" placeholder="ID (ex: I1)" style="width:70px">
-                <input id="pf-name" placeholder="Nom (ex: I.1)" style="width:90px">
+                <input id="pf-name" placeholder="Nom (ex: II2)" style="width:100px" title="Utilisé aussi comme identifiant">
                 <select id="pf-sex">
                   <option value="male">♂ Homme</option>
                   <option value="female">♀ Femme</option>
@@ -389,6 +388,7 @@
               </div>
               <div id="pf-phenotypes" class="builder-phenotypes"></div>
               <button onclick="builderAddPerson()" class="btn-sm">+ Ajouter individu</button>
+              <input id="pf-id" style="display:none">
             </div>
 
             <!-- Couple form -->
@@ -399,6 +399,7 @@
                 <select id="cf-p2" style="width:120px"><option value="">-- Parent 2 --</option></select>
                 <button class="btn-sm" onclick="builderAddCouple()">+ Couple</button>
               </div>
+              <div id="couple-feedback" style="font-size:.8rem;margin-top:.3rem"></div>
             </div>
 
             <!-- Child form -->
@@ -406,8 +407,7 @@
               <div class="builder-section-title">Ajouter un enfant</div>
               <div class="builder-form">
                 <select id="chf-couple" style="width:150px"><option value="">-- Couple --</option></select>
-                <input id="chf-id" placeholder="ID" style="width:60px">
-                <input id="chf-name" placeholder="Nom" style="width:90px">
+                <input id="chf-name" placeholder="Nom (ex: III1)" style="width:100px">
                 <select id="chf-sex">
                   <option value="male">♂</option>
                   <option value="female">♀</option>

@@ -540,13 +540,14 @@ function builderRemoveDisease(id) {
 
 function builderAddPerson() {
   try {
-    var id   = $('pf-id').value.trim();
-    var name = $('pf-name').value.trim() || id;
+    var name = $('pf-name').value.trim();
+    if (!name) throw new Error('Le nom est requis.');
     var sex  = $('pf-sex').value;
     var gen  = parseInt($('pf-gen').value) || 1;
     var phenotypes = builderCollectPhenotypes('pf-ph-');
-    PedigreeBuilder.addPerson({ id: id || undefined, name: name, sex: sex, generation: gen, phenotypes: phenotypes });
-    $('pf-id').value = ''; $('pf-name').value = '';
+    // Use name as ID by default (names like "II2" work as IDs)
+    PedigreeBuilder.addPerson({ id: name, name: name, sex: sex, generation: gen, phenotypes: phenotypes });
+    $('pf-name').value = '';
   } catch(e) { alert(e.message); }
 }
 
@@ -561,30 +562,51 @@ function builderCollectPhenotypes(prefix) {
 }
 
 function builderAddCouple() {
+  var fb = $('couple-feedback');
   try {
     var p1 = $('cf-p1').value, p2 = $('cf-p2').value;
     if (!p1 || !p2 || p1 === p2) throw new Error('Sélectionnez deux individus différents.');
+    var state = PedigreeBuilder.getState();
+    var person1 = state.people[p1], person2 = state.people[p2];
+    var warnings = [];
+    if (person1 && person2 && person1.generation !== person2.generation) {
+      warnings.push('⚠ Générations différentes (' + person1.name + ': gén.' + person1.generation +
+        ', ' + person2.name + ': gén.' + person2.generation + ')');
+    }
+    // Check if either person is already in a couple
+    state.couples.forEach(function(c) {
+      if (c.parents.indexOf(p1) !== -1) warnings.push('⚠ ' + (person1 ? person1.name : p1) + ' est déjà dans un couple.');
+      if (c.parents.indexOf(p2) !== -1) warnings.push('⚠ ' + (person2 ? person2.name : p2) + ' est déjà dans un couple.');
+    });
     PedigreeBuilder.addCouple(p1, p2);
-  } catch(e) { alert(e.message); }
+    var n1 = person1 ? person1.name : p1, n2 = person2 ? person2.name : p2;
+    var msg = '✓ Couple créé : ' + n1 + ' × ' + n2;
+    if (warnings.length) msg += '<br><span style="color:#856404">' + warnings.join('<br>') + '</span>';
+    fb.innerHTML = msg;
+    fb.style.color = '#0a3622';
+  } catch(e) {
+    if (fb) { fb.innerHTML = '✗ ' + e.message; fb.style.color = '#842029'; }
+    else alert(e.message);
+  }
 }
 
 function builderAddChild() {
   try {
     var coupleId = $('chf-couple').value;
-    var id   = $('chf-id').value.trim();
-    var name = $('chf-name').value.trim() || id;
+    var name = $('chf-name').value.trim();
+    if (!name) throw new Error('Le nom est requis.');
     var sex  = $('chf-sex').value;
     var state = PedigreeBuilder.getState();
     var couple = state.couples.find(function(c) { return c.id === coupleId; });
     if (!couple) throw new Error('Sélectionnez un couple.');
-    // Determine child generation = max(parents gen) + 1
     var parentGens = couple.parents.map(function(pid) {
       return (state.people[pid] && state.people[pid].generation) || 1;
     });
     var childGen = Math.max.apply(null, parentGens) + 1;
     var phenotypes = builderCollectPhenotypes('chf-ph-');
-    PedigreeBuilder.addNewChild(coupleId, { id: id || undefined, name: name, sex: sex, generation: childGen, phenotypes: phenotypes });
-    $('chf-id').value = ''; $('chf-name').value = '';
+    // Use name as ID by default
+    PedigreeBuilder.addNewChild(coupleId, { id: name, name: name, sex: sex, generation: childGen, phenotypes: phenotypes });
+    $('chf-name').value = '';
   } catch(e) { alert(e.message); }
 }
 
