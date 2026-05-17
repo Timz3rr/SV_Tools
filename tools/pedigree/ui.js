@@ -461,10 +461,15 @@ function builderRender() {
 function builderRefreshSelects() {
   var state = PedigreeBuilder.getState();
 
-  // Refresh person selects
+  // Refresh person selects (disambiguate duplicate names with generation)
+  var nameCounts = {};
+  Object.values(state.people).forEach(function(p) {
+    nameCounts[p.name] = (nameCounts[p.name] || 0) + 1;
+  });
   var options = '<option value="">--</option>' +
     Object.values(state.people).map(function(p) {
-      return '<option value="' + p.id + '">' + p.name + '</option>';
+      var label = nameCounts[p.name] > 1 ? p.name + ' (gén.' + p.generation + ')' : p.name;
+      return '<option value="' + p.id + '">' + label + '</option>';
     }).join('');
   $('cf-p1').innerHTML = options;
   $('cf-p2').innerHTML = options;
@@ -545,8 +550,14 @@ function builderAddPerson() {
     var sex  = $('pf-sex').value;
     var gen  = parseInt($('pf-gen').value) || 1;
     var phenotypes = builderCollectPhenotypes('pf-ph-');
-    // Use name as ID by default (names like "II2" work as IDs)
-    PedigreeBuilder.addPerson({ id: name, name: name, sex: sex, generation: gen, phenotypes: phenotypes });
+    var existingIds = Object.keys(PedigreeBuilder.getState().people);
+    var id = name;
+    if (existingIds.indexOf(id) !== -1) {
+      var suffix = 2;
+      while (existingIds.indexOf(id + '_' + suffix) !== -1) suffix++;
+      id = id + '_' + suffix;
+    }
+    PedigreeBuilder.addPerson({ id: id, name: name, sex: sex, generation: gen, phenotypes: phenotypes });
     $('pf-name').value = '';
   } catch(e) { alert(e.message); }
 }
@@ -604,8 +615,14 @@ function builderAddChild() {
     });
     var childGen = Math.max.apply(null, parentGens) + 1;
     var phenotypes = builderCollectPhenotypes('chf-ph-');
-    // Use name as ID by default
-    PedigreeBuilder.addNewChild(coupleId, { id: name, name: name, sex: sex, generation: childGen, phenotypes: phenotypes });
+    var existingIds2 = Object.keys(PedigreeBuilder.getState().people);
+    var childId = name;
+    if (existingIds2.indexOf(childId) !== -1) {
+      var sfx = 2;
+      while (existingIds2.indexOf(childId + '_' + sfx) !== -1) sfx++;
+      childId = childId + '_' + sfx;
+    }
+    PedigreeBuilder.addNewChild(coupleId, { id: childId, name: name, sex: sex, generation: childGen, phenotypes: phenotypes });
     $('chf-name').value = '';
   } catch(e) { alert(e.message); }
 }
