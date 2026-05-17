@@ -62,6 +62,12 @@
 
     var positions = {};
 
+    // Pre-build child→parentCoupleId map so siblings stay adjacent in layout
+    var parentCoupleOf = {};
+    couples.forEach(function(c) {
+      (c.children || []).forEach(function(cid) { parentCoupleOf[cid] = c.id; });
+    });
+
     // ── Bottom-up: last generation first ──────────────────────────────────────
     for (var gi = gens.length - 1; gi >= 0; gi--) {
       var gen = gens[gi];
@@ -117,12 +123,32 @@
         return _naturalCompare(na, nb);
       });
 
-      // Sort singles by name so they appear in numerical order
-      singles.sort(function(a, b) {
-        var na = (people[a] && people[a].name) || a;
-        var nb = (people[b] && people[b].name) || b;
-        return _naturalCompare(na, nb);
-      });
+      // Sort singles: group siblings (same parent couple) so they stay adjacent,
+      // then sort groups by first sibling name, and within each group by name.
+      (function() {
+        var groups = {};   // coupleId|'__none__' → [ids]
+        var order  = [];   // coupleId|'__none__' in insertion order
+        singles.forEach(function(id) {
+          var key = parentCoupleOf[id] || '__none__';
+          if (!groups[key]) { groups[key] = []; order.push(key); }
+          groups[key].push(id);
+        });
+        // Sort within each group by name
+        order.forEach(function(k) {
+          groups[k].sort(function(a, b) {
+            return _naturalCompare((people[a]&&people[a].name)||a, (people[b]&&people[b].name)||b);
+          });
+        });
+        // Sort groups by first member name ('__none__' last)
+        order.sort(function(a, b) {
+          if (a === '__none__') return 1;
+          if (b === '__none__') return -1;
+          return _naturalCompare((people[groups[a][0]]&&people[groups[a][0]].name)||groups[a][0],
+                                 (people[groups[b][0]]&&people[groups[b][0]].name)||groups[b][0]);
+        });
+        singles.length = 0;
+        order.forEach(function(k) { groups[k].forEach(function(id) { singles.push(id); }); });
+      }());
 
       // Assign slots ──────────────────────────────────────────────────────────
       var occupied    = {}; // slot → true

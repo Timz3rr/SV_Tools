@@ -30,8 +30,10 @@
                 colorblindness: { carrierProbability: '1/2', source: 'pedigree' },
                 cataract:       { carrierProbability: '1/2', source: 'pedigree' },
               } },
-      III3: { id: 'III3', name: 'III.3',       sex: 'male',   generation: 3,
-              phenotypes: { colorblindness: 'unaffected', cataract: 'unaffected', cholesterol: 'unaffected' } },
+      III3: { id: 'III3', name: 'III.3',       sex: 'female', generation: 3,
+              phenotypes: { colorblindness: 'carrier',    cataract: 'carrier',    cholesterol: 'unaffected' } },
+      III4: { id: 'III4', name: 'III.4',       sex: 'male',   generation: 3,
+              phenotypes: { colorblindness: 'unaffected', cataract: 'carrier',    cholesterol: 'affected'   } },
 
       Aline: { id: 'Aline', name: 'Aline (IV.1)', sex: 'female', generation: 4,
                phenotypes: { colorblindness: 'unaffected', cataract: 'unaffected', cholesterol: 'unaffected' },
@@ -58,6 +60,7 @@
       { id: 'cII1',  parents: ['II2',  'II1'],  children: ['III2'] },
       { id: 'cII2',  parents: ['II3',  'II4'],  children: ['III1'] },
       { id: 'cIII1', parents: ['III1', 'III2'], children: ['Aline', 'Kevin'] },
+      { id: 'cIII2', parents: ['III4', 'III3'], children: ['Zoe', 'Bob'] },
     ],
     riskOverrides: {
       'Aline_Bob_male':  { cataract: '1/8',  colorblindness: '1/2' },
