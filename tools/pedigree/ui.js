@@ -474,13 +474,24 @@ function builderRefreshSelects() {
   $('cf-p1').innerHTML = options;
   $('cf-p2').innerHTML = options;
 
-  // Refresh couple select
+  // Refresh couple select (disambiguate same-name pairs with generation)
+  var coupleLabelCount = {};
+  state.couples.forEach(function(c) {
+    var p1 = state.people[c.parents[0]], p2 = state.people[c.parents[1]];
+    var key = (p1 ? p1.name : c.parents[0]) + '×' + (p2 ? p2.name : (c.parents[1] || '?'));
+    coupleLabelCount[key] = (coupleLabelCount[key] || 0) + 1;
+  });
   var coupleOptions = '<option value="">-- Couple --</option>' +
     state.couples.map(function(c) {
-      var p1 = state.people[c.parents[0]];
-      var p2 = state.people[c.parents[1]];
-      return '<option value="' + c.id + '">' +
-        (p1 ? p1.name : c.parents[0]) + ' × ' + (p2 ? p2.name : (c.parents[1] || '?')) + '</option>';
+      var p1 = state.people[c.parents[0]], p2 = state.people[c.parents[1]];
+      var n1 = p1 ? p1.name : c.parents[0], n2 = p2 ? p2.name : (c.parents[1] || '?');
+      var key = n1 + '×' + n2;
+      var label = n1 + ' × ' + n2;
+      if (coupleLabelCount[key] > 1) {
+        var g1 = p1 ? p1.generation : '?', g2 = p2 ? p2.generation : '?';
+        label += ' (gén.' + Math.min(g1, g2) + '+' + Math.max(g1, g2) + ')';
+      }
+      return '<option value="' + c.id + '">' + label + '</option>';
     }).join('');
   $('chf-couple').innerHTML = coupleOptions;
 

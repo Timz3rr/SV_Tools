@@ -30,6 +30,20 @@
     return el;
   }
 
+  // Natural string comparison: "II3" < "II10", "I1" < "I2"
+  function _naturalCompare(a, b) {
+    var re = /(\d+)|(\D+)/g;
+    var aParts = (a || '').match(re) || [];
+    var bParts = (b || '').match(re) || [];
+    for (var i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+      var ap = aParts[i] || '', bp = bParts[i] || '';
+      var an = parseInt(ap, 10), bn = parseInt(bp, 10);
+      if (!isNaN(an) && !isNaN(bn)) { if (an !== bn) return an - bn; }
+      else { if (ap < bp) return -1; if (ap > bp) return 1; }
+    }
+    return 0;
+  }
+
   // Build layout: returns map personId → {cx, cy}
   // Uses a bottom-up pass so parents are centered above their children,
   // which avoids couple drop-lines traversing unrelated nodes.
@@ -92,12 +106,22 @@
 
       var singles = ids.filter(function(id) { return !inCouple[id]; });
 
-      // Sort: constrained couples first (ascending desired slot), then free couples, then singles
+      // Sort: constrained couples first (ascending desired slot), then free couples (by name), then singles
       genCouples.sort(function(a, b) {
         if (a.desiredSlotL !== null && b.desiredSlotL !== null) return a.desiredSlotL - b.desiredSlotL;
         if (a.desiredSlotL !== null) return -1;
         if (b.desiredSlotL !== null) return 1;
-        return 0;
+        // Both free: sort by left member name
+        var na = (people[a.left] && people[a.left].name) || a.left;
+        var nb = (people[b.left] && people[b.left].name) || b.left;
+        return _naturalCompare(na, nb);
+      });
+
+      // Sort singles by name so they appear in numerical order
+      singles.sort(function(a, b) {
+        var na = (people[a] && people[a].name) || a;
+        var nb = (people[b] && people[b].name) || b;
+        return _naturalCompare(na, nb);
       });
 
       // Assign slots ──────────────────────────────────────────────────────────

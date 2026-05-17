@@ -13,11 +13,6 @@
              phenotypes: { colorblindness: 'affected',   cataract: 'unaffected', cholesterol: 'unaffected' } },
       I2:  { id: 'I2',  name: 'I.2',           sex: 'female', generation: 1,
              phenotypes: { colorblindness: 'unaffected', cataract: 'unaffected', cholesterol: 'unaffected' } },
-      I3:  { id: 'I3',  name: 'I.3',           sex: 'male',   generation: 1,
-             phenotypes: { colorblindness: 'unaffected', cataract: 'unaffected', cholesterol: 'unaffected' } },
-      I4:  { id: 'I4',  name: 'I.4',           sex: 'female', generation: 1,
-             phenotypes: { colorblindness: 'unaffected', cataract: 'carrier',    cholesterol: 'unaffected' } },
-
       II1: { id: 'II1', name: 'II.1',          sex: 'female', generation: 2,
              phenotypes: { colorblindness: 'carrier',    cataract: 'unaffected', cholesterol: 'unaffected' } },
       II2: { id: 'II2', name: 'II.2',          sex: 'male',   generation: 2,
@@ -60,7 +55,6 @@
     },
     couples: [
       { id: 'cI1',   parents: ['I1',   'I2'],   children: ['II1', 'II2'] },
-      { id: 'cI2',   parents: ['I3',   'I4'],   children: ['II3'] },
       { id: 'cII1',  parents: ['II2',  'II1'],  children: ['III2'] },
       { id: 'cII2',  parents: ['II3',  'II4'],  children: ['III1'] },
       { id: 'cIII1', parents: ['III1', 'III2'], children: ['Aline', 'Kevin'] },
