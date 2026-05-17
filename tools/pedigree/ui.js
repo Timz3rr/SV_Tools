@@ -735,14 +735,18 @@ function rcRefreshSelects() {
   var state = PedigreeBuilder ? PedigreeBuilder.getState() : null;
   if (!state) return;
   var people = Object.values(state.people);
-  var pOpts = '<option value="">--</option>' +
+  var motherOpts = '<option value="">-- Mère --</option>' +
+    people.map(function(p) {
+      return '<option value="' + p.id + '">' + p.name + '</option>';
+    }).join('');
+  var fatherOpts = '<option value="">-- Père --</option>' +
     people.map(function(p) {
       return '<option value="' + p.id + '">' + p.name + '</option>';
     }).join('');
   var rcP1 = $('rc-p1'), rcP2 = $('rc-p2'), btMother = $('bt-mother');
-  if (rcP1) rcP1.innerHTML = pOpts;
-  if (rcP2) rcP2.innerHTML = pOpts;
-  if (btMother) btMother.innerHTML = pOpts;
+  if (rcP1) rcP1.innerHTML = motherOpts;
+  if (rcP2) rcP2.innerHTML = fatherOpts;
+  if (btMother) btMother.innerHTML = motherOpts;
 
   var diseases = Object.entries(state.diseases);
   var dOpts = '<option value="">-- Maladie --</option>' +
@@ -788,8 +792,8 @@ function rcLoadQ62() {
     alert('Chargez d\'abord l\'exemple Q6.');
     return;
   }
-  $('rc-p1').value = 'Kevin';
-  $('rc-p2').value = 'Zoe';
+  $('rc-p1').value = 'Zoe';
+  $('rc-p2').value = 'Kevin';
   $('rc-sex').value = 'male';
   $('rc-dA').value = 'cataract';
   $('rc-dB').value = 'colorblindness';
@@ -808,7 +812,7 @@ function rcCalculate() {
     var dAId     = $('rc-dA').value;
     var dBId     = $('rc-dB').value;
 
-    if (!p1Id || !p2Id) throw new Error('Sélectionnez deux parents.');
+    if (!p1Id || !p2Id) throw new Error('Sélectionnez une mère et un père.');
     if (p1Id === p2Id)  throw new Error('Les deux parents doivent être différents.');
     if (!dAId)          throw new Error('Sélectionnez au moins une maladie.');
 
