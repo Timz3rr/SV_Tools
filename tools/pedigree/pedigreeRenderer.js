@@ -137,6 +137,17 @@
         used[p2] = true;
 
         var ordered = _normalizeCoupleParents(couple, people);
+        var p1ParentCoupleId = parentCoupleOf[p1];
+        var p2ParentCoupleId = parentCoupleOf[p2];
+        var p1ParentCouple = p1ParentCoupleId ? couplesById[p1ParentCoupleId] : null;
+        var p2ParentCouple = p2ParentCoupleId ? couplesById[p2ParentCoupleId] : null;
+        var p1AnchorX = p1ParentCouple ? _coupleCenterX(p1ParentCouple, positions) : null;
+        var p2AnchorX = p2ParentCouple ? _coupleCenterX(p2ParentCouple, positions) : null;
+
+        if (p1AnchorX !== null && p2AnchorX !== null && p1AnchorX !== p2AnchorX) {
+          ordered = p1AnchorX < p2AnchorX ? [p1, p2] : [p2, p1];
+        }
+
         units.push({
           id: 'u' + (unitCounter++),
           kind: 'couple',
@@ -241,29 +252,30 @@
         return _naturalCompare(a.sortLabel, b.sortLabel);
       });
 
-      var nextSlot = 0;
+      var nextX = MARGIN;
       blocks.forEach(function(block) {
-        var startSlot = nextSlot;
+        var spanPx = (block.widthSlots - 1) * COL_WIDTH;
+        var startX = nextX;
         if (block.anchorX !== null) {
-          startSlot = Math.round((block.anchorX - MARGIN) / COL_WIDTH - ((block.widthSlots - 1) / 2));
-          if (startSlot < nextSlot) startSlot = nextSlot;
+          startX = block.anchorX - (spanPx / 2);
+          if (startX < nextX) startX = nextX;
         }
 
-        var cursor = startSlot;
+        var cursorX = startX;
         block.units.forEach(function(unit, idx) {
-          if (idx > 0) cursor += UNIT_GAP;
+          if (idx > 0) cursorX += UNIT_GAP * COL_WIDTH;
 
           if (unit.kind === 'couple') {
-            positions[unit.members[0]] = { cx: MARGIN + cursor * COL_WIDTH, cy: cy };
-            positions[unit.members[1]] = { cx: MARGIN + (cursor + 1) * COL_WIDTH, cy: cy };
-            cursor += 2;
+            positions[unit.members[0]] = { cx: cursorX, cy: cy };
+            positions[unit.members[1]] = { cx: cursorX + COL_WIDTH, cy: cy };
+            cursorX += 2 * COL_WIDTH;
           } else {
-            positions[unit.members[0]] = { cx: MARGIN + cursor * COL_WIDTH, cy: cy };
-            cursor += 1;
+            positions[unit.members[0]] = { cx: cursorX, cy: cy };
+            cursorX += COL_WIDTH;
           }
         });
 
-        nextSlot = startSlot + block.widthSlots + BLOCK_GAP;
+        nextX = startX + spanPx + (BLOCK_GAP * COL_WIDTH);
       });
     });
 
