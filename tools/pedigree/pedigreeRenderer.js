@@ -6,6 +6,8 @@
   var ROW_HEIGHT = 140;
   var MARGIN     = 60;
   var NODE_R     = 16;
+  var UNIT_GAP   = 0;
+  var BLOCK_GAP  = 1;
 
   // Lighten a hex color towards white by `factor` (0=same, 1=white)
   function _lightenHex(hex, factor) {
@@ -44,152 +46,226 @@
     return 0;
   }
 
-  // Build layout: returns map personId → {cx, cy}
-  // Uses a bottom-up pass so parents are centered above their children,
-  // which avoids couple drop-lines traversing unrelated nodes.
-  function _buildLayout(state) {
-    var people  = state.people;
-    var couples = state.couples;
+  function _personLabel(people, id) {
+    return (people[id] && people[id].name) || id;
+  }
 
-    // Group by generation
+  function _normalizeCoupleParents(couple, people) {
+    var p1 = couple.parents[0];
+    var p2 = couple.parents[1];
+    var left = p1;
+    var right = p2;
+    var p1o = people[p1];
+    var p2o = people[p2];
+
+    if (p1o && p2o) {
+      if (p1o.sex === 'female' && p2o.sex === 'male') {
+        left = p2;
+        right = p1;
+      } else if (p1o.sex === p2o.sex &&
+                 _naturalCompare(_personLabel(people, p1), _personLabel(people, p2)) > 0) {
+        left = p2;
+        right = p1;
+      }
+    }
+
+    return [left, right];
+  }
+
+  function _coupleCenterX(couple, positions) {
+    var p1 = positions[couple.parents[0]];
+    var p2 = positions[couple.parents[1]];
+    if (!p1 || !p2) return null;
+    return (p1.cx + p2.cx) / 2;
+  }
+
+  // Build layout: returns map personId → {cx, cy}
+  // Couples are treated as family units and sibling groups are centered under
+  // their actual parent couple whenever that parent couple is already placed.
+  function _buildLayout(state) {
+    var people = state.people || {};
+    var couples = state.couples || [];
     var byGen = {};
+
     Object.values(people).forEach(function(p) {
       var g = p.generation || 1;
       if (!byGen[g]) byGen[g] = [];
       byGen[g].push(p.id);
     });
+
     var gens = Object.keys(byGen).map(Number).sort(function(a, b) { return a - b; });
-
     var positions = {};
-
-    // Pre-build child→parentCoupleId map so siblings stay adjacent in layout
     var parentCoupleOf = {};
-    couples.forEach(function(c) {
-      (c.children || []).forEach(function(cid) { parentCoupleOf[cid] = c.id; });
+    var childIndexWithinParentCouple = {};
+    var couplesById = {};
+    var couplesByGen = {};
+
+    couples.forEach(function(couple) {
+      couplesById[couple.id] = couple;
+
+      (couple.children || []).forEach(function(cid, idx) {
+        if (parentCoupleOf[cid] === undefined) parentCoupleOf[cid] = couple.id;
+        childIndexWithinParentCouple[cid] = idx;
+      });
+
+      var p1 = people[couple.parents[0]];
+      var p2 = people[couple.parents[1]];
+      if (!p1 || !p2) return;
+      if ((p1.generation || 1) !== (p2.generation || 1)) return;
+
+      var gen = p1.generation || 1;
+      if (!couplesByGen[gen]) couplesByGen[gen] = [];
+      couplesByGen[gen].push(couple);
     });
 
-    // ── Bottom-up: last generation first ──────────────────────────────────────
-    for (var gi = gens.length - 1; gi >= 0; gi--) {
-      var gen = gens[gi];
-      var cy  = MARGIN + (gen - 1) * ROW_HEIGHT;
-      var ids = byGen[gen].slice();
-
-      // Collect couples whose both parents are in this generation
-      var genCouples = [];
-      var inCouple   = {};
-      couples.forEach(function(couple) {
-        var p1 = couple.parents[0], p2 = couple.parents[1];
-        if (!p2) return;
-        if (ids.indexOf(p1) === -1 || ids.indexOf(p2) === -1) return;
-        if (inCouple[p1] || inCouple[p2]) return;
-        inCouple[p1] = inCouple[p2] = true;
-
-        // Convention: male on left, female on right
-        var left = p1, right = p2;
-        var p1o  = people[p1], p2o = people[p2];
-        if (p1o && p2o && p1o.sex === 'female' && p2o.sex === 'male') {
-          left = p2; right = p1;
-        }
-
-        // Desired left-slot: center this couple above its children (already placed)
-        var desiredSlotL = null;
-        var children = couple.children || [];
-        if (children.length > 0) {
-          var childXs = children
-            .filter(function(cid) { return positions[cid]; })
-            .map(function(cid)    { return positions[cid].cx; });
-          if (childXs.length > 0) {
-            var minX = Math.min.apply(null, childXs);
-            var maxX = Math.max.apply(null, childXs);
-            var midX = (minX + maxX) / 2;
-            // slot such that MARGIN + (slotL + 0.5)*COL_WIDTH ≈ midX
-            desiredSlotL = Math.round((midX - MARGIN - COL_WIDTH / 2) / COL_WIDTH);
-            if (desiredSlotL < 0) desiredSlotL = 0;
-          }
-        }
-        genCouples.push({ left: left, right: right, desiredSlotL: desiredSlotL });
+    gens.forEach(function(gen) {
+      var cy = MARGIN + (gen - 1) * ROW_HEIGHT;
+      var ids = byGen[gen].slice().sort(function(a, b) {
+        return _naturalCompare(_personLabel(people, a), _personLabel(people, b));
       });
+      var used = {};
+      var units = [];
+      var unitCounter = 0;
+      var blockCounter = 0;
 
-      var singles = ids.filter(function(id) { return !inCouple[id]; });
+      (couplesByGen[gen] || []).forEach(function(couple) {
+        var p1 = couple.parents[0];
+        var p2 = couple.parents[1];
+        if (used[p1] || used[p2]) return;
 
-      // Sort: constrained couples first (ascending desired slot), then free couples (by name), then singles
-      genCouples.sort(function(a, b) {
-        if (a.desiredSlotL !== null && b.desiredSlotL !== null) return a.desiredSlotL - b.desiredSlotL;
-        if (a.desiredSlotL !== null) return -1;
-        if (b.desiredSlotL !== null) return 1;
-        // Both free: sort by left member name
-        var na = (people[a.left] && people[a.left].name) || a.left;
-        var nb = (people[b.left] && people[b.left].name) || b.left;
-        return _naturalCompare(na, nb);
-      });
+        used[p1] = true;
+        used[p2] = true;
 
-      // Sort singles: group siblings (same parent couple) so they stay adjacent,
-      // then sort groups by first sibling name, and within each group by name.
-      (function() {
-        var groups = {};   // coupleId|'__none__' → [ids]
-        var order  = [];   // coupleId|'__none__' in insertion order
-        singles.forEach(function(id) {
-          var key = parentCoupleOf[id] || '__none__';
-          if (!groups[key]) { groups[key] = []; order.push(key); }
-          groups[key].push(id);
+        var ordered = _normalizeCoupleParents(couple, people);
+        units.push({
+          id: 'u' + (unitCounter++),
+          kind: 'couple',
+          coupleId: couple.id,
+          members: ordered,
+          widthSlots: 2,
+          sortLabel: _personLabel(people, ordered[0]) + ' ' + _personLabel(people, ordered[1]),
         });
-        // Sort within each group by name
-        order.forEach(function(k) {
-          groups[k].sort(function(a, b) {
-            return _naturalCompare((people[a]&&people[a].name)||a, (people[b]&&people[b].name)||b);
-          });
-        });
-        // Sort groups by first member name ('__none__' last)
-        order.sort(function(a, b) {
-          if (a === '__none__') return 1;
-          if (b === '__none__') return -1;
-          return _naturalCompare((people[groups[a][0]]&&people[groups[a][0]].name)||groups[a][0],
-                                 (people[groups[b][0]]&&people[groups[b][0]].name)||groups[b][0]);
-        });
-        singles.length = 0;
-        order.forEach(function(k) { groups[k].forEach(function(id) { singles.push(id); }); });
-      }());
-
-      // Assign slots ──────────────────────────────────────────────────────────
-      var occupied    = {}; // slot → true
-      var assignments = {}; // personId → slot
-
-      function pairFits(s) { return !occupied[s] && !occupied[s + 1]; }
-
-      // Constrained couples: place at or after their desired slot
-      genCouples.forEach(function(cg) {
-        if (cg.desiredSlotL === null) return;
-        var s = cg.desiredSlotL;
-        while (!pairFits(s)) s++;
-        occupied[s] = occupied[s + 1] = true;
-        assignments[cg.left]  = s;
-        assignments[cg.right] = s + 1;
       });
 
-      // Free couples: pack into earliest available pair
-      genCouples.forEach(function(cg) {
-        if (cg.desiredSlotL !== null) return;
-        var s = 0;
-        while (!pairFits(s)) s++;
-        occupied[s] = occupied[s + 1] = true;
-        assignments[cg.left]  = s;
-        assignments[cg.right] = s + 1;
-      });
-
-      // Singles: pack into earliest free slot
-      singles.forEach(function(id) {
-        var s = 0;
-        while (occupied[s]) s++;
-        occupied[s] = true;
-        assignments[id] = s;
-      });
-
-      // Store positions
       ids.forEach(function(id) {
-        var slot = assignments[id] !== undefined ? assignments[id] : 0;
-        positions[id] = { cx: MARGIN + slot * COL_WIDTH, cy: cy };
+        if (used[id]) return;
+        units.push({
+          id: 'u' + (unitCounter++),
+          kind: 'single',
+          members: [id],
+          widthSlots: 1,
+          sortLabel: _personLabel(people, id),
+        });
       });
-    }
+
+      units.forEach(function(unit) {
+        var seenAnchorGroups = {};
+        var anchorGroups = [];
+        var anchorXs = [];
+        var orderIndex = null;
+
+        unit.members.forEach(function(id) {
+          var parentCoupleId = parentCoupleOf[id];
+          if (!parentCoupleId) return;
+
+          var parentCouple = couplesById[parentCoupleId];
+          var anchorX = parentCouple ? _coupleCenterX(parentCouple, positions) : null;
+          if (anchorX === null) return;
+
+          anchorXs.push(anchorX);
+          if (!seenAnchorGroups[parentCoupleId]) {
+            seenAnchorGroups[parentCoupleId] = true;
+            anchorGroups.push(parentCoupleId);
+          }
+
+          var childOrder = childIndexWithinParentCouple[id];
+          if (childOrder !== undefined && (orderIndex === null || childOrder < orderIndex)) {
+            orderIndex = childOrder;
+          }
+        });
+
+        unit.anchorX = anchorXs.length
+          ? anchorXs.reduce(function(sum, value) { return sum + value; }, 0) / anchorXs.length
+          : null;
+        unit.anchorGroup = anchorGroups.length === 1 ? anchorGroups[0] : null;
+        unit.orderIndex = orderIndex === null ? 9007199254740991 : orderIndex;
+      });
+
+      var groupedBlocks = {};
+      var blocks = [];
+
+      function _makeBlock(unit, key, anchorX) {
+        return {
+          id: key || ('b' + (blockCounter++)),
+          anchorX: anchorX,
+          units: unit ? [unit] : [],
+        };
+      }
+
+      units.forEach(function(unit) {
+        if (unit.anchorGroup) {
+          if (!groupedBlocks[unit.anchorGroup]) {
+            groupedBlocks[unit.anchorGroup] = _makeBlock(null, unit.anchorGroup, unit.anchorX);
+            blocks.push(groupedBlocks[unit.anchorGroup]);
+          }
+          groupedBlocks[unit.anchorGroup].units.push(unit);
+          return;
+        }
+
+        blocks.push(_makeBlock(unit, null, unit.anchorX));
+      });
+
+      blocks.forEach(function(block) {
+        block.units.sort(function(a, b) {
+          if (a.orderIndex !== b.orderIndex) return a.orderIndex - b.orderIndex;
+          if (a.kind !== b.kind) return a.kind === 'couple' ? -1 : 1;
+          return _naturalCompare(a.sortLabel, b.sortLabel);
+        });
+
+        block.widthSlots = 0;
+        block.hasCouple = false;
+        block.sortLabel = block.units.length ? block.units[0].sortLabel : '';
+
+        block.units.forEach(function(unit, idx) {
+          block.widthSlots += unit.widthSlots;
+          if (idx > 0) block.widthSlots += UNIT_GAP;
+          if (unit.kind === 'couple') block.hasCouple = true;
+        });
+      });
+
+      blocks.sort(function(a, b) {
+        if (a.anchorX !== null && b.anchorX !== null) return a.anchorX - b.anchorX;
+        if (a.anchorX !== null) return -1;
+        if (b.anchorX !== null) return 1;
+        if (a.hasCouple !== b.hasCouple) return a.hasCouple ? -1 : 1;
+        return _naturalCompare(a.sortLabel, b.sortLabel);
+      });
+
+      var nextSlot = 0;
+      blocks.forEach(function(block) {
+        var startSlot = nextSlot;
+        if (block.anchorX !== null) {
+          startSlot = Math.round((block.anchorX - MARGIN) / COL_WIDTH - ((block.widthSlots - 1) / 2));
+          if (startSlot < nextSlot) startSlot = nextSlot;
+        }
+
+        var cursor = startSlot;
+        block.units.forEach(function(unit, idx) {
+          if (idx > 0) cursor += UNIT_GAP;
+
+          if (unit.kind === 'couple') {
+            positions[unit.members[0]] = { cx: MARGIN + cursor * COL_WIDTH, cy: cy };
+            positions[unit.members[1]] = { cx: MARGIN + (cursor + 1) * COL_WIDTH, cy: cy };
+            cursor += 2;
+          } else {
+            positions[unit.members[0]] = { cx: MARGIN + cursor * COL_WIDTH, cy: cy };
+            cursor += 1;
+          }
+        });
+
+        nextSlot = startSlot + block.widthSlots + BLOCK_GAP;
+      });
+    });
 
     return positions;
   }
@@ -403,21 +479,24 @@
       var pos1 = positions[p1Id], pos2 = p2Id ? positions[p2Id] : null;
       if (!pos1) return;
 
-      var coupleY  = pos1.cy;
+      // Use the top-most y so cross-generation couples draw at the upper parent's level
+      var coupleY  = pos2 ? Math.min(pos1.cy, pos2.cy) : pos1.cy;
       var midX;
+      var leftPos, rightPos;
 
       if (pos2) {
         // Ensure left/right order
-        var leftPos  = pos1.cx < pos2.cx ? pos1 : pos2;
-        var rightPos = pos1.cx < pos2.cx ? pos2 : pos1;
+        leftPos  = pos1.cx < pos2.cx ? pos1 : pos2;
+        rightPos = pos1.cx < pos2.cx ? pos2 : pos1;
         midX = (leftPos.cx + rightPos.cx) / 2;
 
-        // Couple line
+        // Couple line — drawn at the y of the upper (or same-level) parent
         linesG.appendChild(_svgEl('line', Object.assign({
           x1: leftPos.cx + NODE_R, y1: coupleY,
           x2: rightPos.cx - NODE_R, y2: coupleY,
         }, lineStyle)));
       } else {
+        leftPos = rightPos = null;
         midX = pos1.cx;
       }
 
@@ -427,34 +506,45 @@
       var childPositions = couple.children.map(function(cid) { return positions[cid]; }).filter(Boolean);
       if (childPositions.length === 0) return;
 
-      var childY    = childPositions[0].cy;
+      var childY    = Math.min.apply(null, childPositions.map(function(p) { return p.cy; }));
       var barY      = coupleY + (childY - coupleY) / 2;
 
-      // Drop line from couple midpoint to barY
-      linesG.appendChild(_svgEl('line', Object.assign({
-        x1: midX, y1: coupleY,
-        x2: midX, y2: barY,
-      }, lineStyle)));
-
-      // Horizontal bar connecting children
       var childXs = childPositions.map(function(p) { return p.cx; });
       var barX1   = Math.min.apply(null, childXs);
       var barX2   = Math.max.apply(null, childXs);
 
+      // For a single child that lies outside the couple's horizontal span, drop from the
+      // nearest couple endpoint instead of midX.  This avoids a long cross-column horizontal
+      // line and prevents the descent from visually overlapping an unrelated parent above.
+      var dropX = midX;
+      if (leftPos && barX1 === barX2) {
+        if (barX1 <= leftPos.cx)  dropX = leftPos.cx  + NODE_R;  // child left of couple
+        if (barX1 >= rightPos.cx) dropX = rightPos.cx - NODE_R;  // child right of couple
+      }
+
+      // Drop line from dropX to barY
+      linesG.appendChild(_svgEl('line', Object.assign({
+        x1: dropX, y1: coupleY,
+        x2: dropX, y2: barY,
+      }, lineStyle)));
+
+      // Horizontal bar connecting children
       if (barX1 < barX2) {
-        // Extend bar to midX if midX is outside range
-        var barLeft  = Math.min(barX1, midX);
-        var barRight = Math.max(barX2, midX);
+        // Multiple children: extend bar to cover dropX as well
+        var barLeft  = Math.min(barX1, dropX);
+        var barRight = Math.max(barX2, dropX);
         linesG.appendChild(_svgEl('line', Object.assign({
           x1: barLeft, y1: barY,
           x2: barRight, y2: barY,
         }, lineStyle)));
       } else {
-        // Single child: just draw a line from midX to child
-        linesG.appendChild(_svgEl('line', Object.assign({
-          x1: midX, y1: barY,
-          x2: barX1, y2: barY,
-        }, lineStyle)));
+        // Single child: horizontal from dropX to child (zero-length if already aligned)
+        if (dropX !== barX1) {
+          linesG.appendChild(_svgEl('line', Object.assign({
+            x1: dropX, y1: barY,
+            x2: barX1, y2: barY,
+          }, lineStyle)));
+        }
       }
 
       // Stems from bar to each child
