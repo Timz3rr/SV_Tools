@@ -919,13 +919,13 @@ function rcRenderResult(result, state, diseases, source) {
 
 function btLoadQ63() {
   var state = PedigreeBuilder.getState();
-  if (!state.people['III2']) {
+  if (!state.people['Zoe'] || !state.people['Kevin']) {
     alert('Chargez d\'abord l\'exemple Q6.');
     return;
   }
-  $('bt-mother').value  = 'III2';
+  $('bt-mother').value  = 'Zoe';
   $('bt-disease').value = 'colorblindness';
-  var p   = state.people['III2'];
+  var p   = state.people['Zoe'];
   var ovCb = p.statusOverrides && p.statusOverrides['colorblindness'];
   $('bt-prior').value = ovCb ? ovCb.carrierProbability : '1/2';
   $('bt-sons').value  = '1';
