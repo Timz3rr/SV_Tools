@@ -518,8 +518,11 @@ function bayesXLinkedAfterUnaffectedSons(priorCarrierProbability, numberOfUnaffe
   // P(conductrice | n fils indemnes) = prior × (1/2)^n  /  [prior × (1/2)^n + (1−prior) × 1]
   var likeCarrier = F.frac(1, Math.pow(2, n)); // exact car n entier
   var num = F.mul(prior, likeCarrier);
-  var den = F.add(num, F.complement(prior));
+  var priorNonCarrier = F.complement(prior);
+  var likeNonCarrier = F.ONE;
+  var den = F.add(num, priorNonCarrier);
   var posterior = F.div(num, den);
+  var posteriorNonCarrier = F.complement(posterior);
   var riskAff  = F.mul(posterior, F.HALF);
   var riskSafe = F.complement(riskAff);
 
@@ -530,12 +533,26 @@ function bayesXLinkedAfterUnaffectedSons(priorCarrierProbability, numberOfUnaffe
     _posteriorFraction: posterior,
     _riskAffFraction:   riskAff,
     _riskSafeFraction:  riskSafe,
+    calcDetails: {
+      priorCarrier:                F.fmt(prior),
+      priorNonCarrier:             F.fmt(priorNonCarrier),
+      likelihoodObservedCarrier:   F.fmt(likeCarrier),
+      likelihoodObservedNonCarrier:F.fmt(likeNonCarrier),
+      numerator:                   F.fmt(num),
+      denominator:                 F.fmt(den),
+      posteriorCarrier:            F.fmt(posterior),
+      posteriorNonCarrier:         F.fmt(posteriorNonCarrier),
+      nextSonAffectedIfCarrier:    '1/2',
+      nextSonUnaffectedIfCarrier:  '1/2',
+      nextSonUnaffectedIfNonCarrier:'1',
+      nextSonUnaffectedTotal:      F.fmt(riskSafe),
+    },
     explanationSteps: [
       'Prior P(conductrice) = ' + F.fmt(prior) + '.',
       'P(fils indemne | conductrice) = (1/2)^' + n + ' = ' + F.fmt(likeCarrier) + '.',
       'P(fils indemne | non conductrice) = 1.',
       'Numérateur   = ' + F.fmt(prior) + ' × ' + F.fmt(likeCarrier) + ' = ' + F.fmt(num) + '.',
-      'Dénominateur = ' + F.fmt(num) + ' + ' + F.fmt(F.complement(prior)) + ' = ' + F.fmt(den) + '.',
+      'Dénominateur = ' + F.fmt(num) + ' + ' + F.fmt(priorNonCarrier) + ' = ' + F.fmt(den) + '.',
       'P(conductrice | données) = ' + F.fmt(num) + ' / ' + F.fmt(den) + ' = ' + F.fmt(posterior) + '.',
       'P(prochain fils atteint)  = ' + F.fmt(posterior) + ' × 1/2 = ' + F.fmt(riskAff) + '.',
       'P(prochain fils indemne)  = 1 − ' + F.fmt(riskAff) + ' = ' + F.fmt(riskSafe) + '.',

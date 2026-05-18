@@ -1092,7 +1092,6 @@ function btFillPriorFromTree() {
 function btCalculate() {
   var resultEl = $('bt-result');
   try {
-    var presetId = $('bt-preset') ? $('bt-preset').value : 'custom';
     var motherId = $('bt-mother').value;
     var diseaseId = $('bt-disease').value;
     var prior = ($('bt-prior').value || '').trim();
@@ -1110,9 +1109,13 @@ function btCalculate() {
     var motherLabel = _btSelectedText('bt-mother');
     var diseaseLabel = _btSelectedText('bt-disease');
     var answerLabel = _btState.answerLabel || BT_PRESETS.custom.answerLabel;
+    var details = r.calcDetails || {};
     var observationLabel = nSons === 1
       ? 'après 1 garçon non atteint observé'
       : 'après ' + nSons + ' garçons non atteints observés';
+    var observedEventLabel = nSons === 1
+      ? '1 garçon non atteint'
+      : (nSons + ' garçons non atteints');
 
     var html = '';
     html += '<div class="bayes-answer">';
@@ -1126,6 +1129,20 @@ function btCalculate() {
     html += '<div class="bayes-kpi"><div class="bayes-kpi-label">P(conductrice) a posteriori</div><div class="bayes-kpi-value">' + r.posteriorCarrierProbability + '</div></div>';
     html += '<div class="bayes-kpi"><div class="bayes-kpi-label">P(prochain fils atteint)</div><div class="bayes-kpi-value">' + r.riskNextSonAffected + '</div></div>';
     html += '<div class="bayes-kpi"><div class="bayes-kpi-label">P(prochain fils non atteint)</div><div class="bayes-kpi-value">' + r.riskNextSonUnaffected + '</div></div>';
+    html += '</div>';
+
+    html += '<div class="bayes-calc-box">';
+    html += '<div class="bayes-calc-title">Calcul détaillé</div>';
+    html += '<div class="bayes-calc-line">On note <code>H</code> = "la mère est conductrice" et <code>D</code> = "' + observedEventLabel + '".</div>';
+    html += '<div class="bayes-calc-line"><code>P(H|D) = P(D|H) × P(H) / P(D)</code></div>';
+    html += '<div class="bayes-calc-line"><code>P(D) = P(D|H) × P(H) + P(D|non H) × P(non H)</code></div>';
+    html += '<div class="bayes-calc-line"><code>P(H) = ' + details.priorCarrier + '</code> et <code>P(non H) = ' + details.priorNonCarrier + '</code></div>';
+    html += '<div class="bayes-calc-line"><code>P(D|H) = ' + details.likelihoodObservedCarrier + '</code> et <code>P(D|non H) = ' + details.likelihoodObservedNonCarrier + '</code></div>';
+    html += '<div class="bayes-calc-line"><code>P(D) = ' + details.likelihoodObservedCarrier + ' × ' + details.priorCarrier + ' + ' + details.likelihoodObservedNonCarrier + ' × ' + details.priorNonCarrier + ' = ' + details.denominator + '</code></div>';
+    html += '<div class="bayes-calc-line"><code>P(H|D) = (' + details.likelihoodObservedCarrier + ' × ' + details.priorCarrier + ') / ' + details.denominator + ' = ' + details.numerator + ' / ' + details.denominator + ' = ' + details.posteriorCarrier + '</code></div>';
+    html += '<div class="bayes-calc-line">Donc <code>P(non H|D) = ' + details.posteriorNonCarrier + '</code>.</div>';
+    html += '<div class="bayes-calc-line"><code>P(prochain fils non atteint) = P(non H|D) × 1 + P(H|D) × 1/2</code></div>';
+    html += '<div class="bayes-calc-line"><code>P(prochain fils non atteint) = ' + details.posteriorNonCarrier + ' + ' + details.posteriorCarrier + ' × ' + details.nextSonUnaffectedIfCarrier + ' = ' + details.nextSonUnaffectedTotal + '</code></div>';
     html += '</div>';
 
     // Evolution table
