@@ -34,6 +34,50 @@ function updateBandVisual() {
   $('band-pat').classList.toggle('band-absent', val === 'pat_absent_mat_only' || val === 'unknown');
 }
 
+function renderBandVisualForValue(southernValue) {
+  var matAbsent = southernValue === 'mat_absent_pat_only' || southernValue === 'unknown';
+  var patAbsent = southernValue === 'pat_absent_mat_only' || southernValue === 'unknown';
+  return '' +
+    '<div class="band-visual compact">' +
+      '<div>' +
+        '<div class="text-muted" style="font-size:.7rem;margin-bottom:.25rem">4,2 kb</div>' +
+        '<div class="band band-mat' + (matAbsent ? ' band-absent' : '') + '">MAT</div>' +
+      '</div>' +
+      '<div>' +
+        '<div class="text-muted" style="font-size:.7rem;margin-bottom:.25rem">0,9 kb</div>' +
+        '<div class="band band-pat' + (patAbsent ? ' band-absent' : '') + '">PAT</div>' +
+      '</div>' +
+    '</div>';
+}
+
+function renderMarkerVisual(value) {
+  if (value === 'maternal_and_paternal') {
+    return '<div class="marker-visual">' +
+      '<span class="marker-pill marker-mat">Allèle MAT</span>' +
+      '<span class="marker-pill marker-pat">Allèle PAT</span>' +
+      '</div>';
+  }
+  if (value === 'maternal_only') {
+    return '<div class="marker-visual">' +
+      '<span class="marker-pill marker-mat">Allèle MAT</span>' +
+      '<span class="marker-pill marker-missing">PAT absent</span>' +
+      '</div>';
+  }
+  if (value === 'paternal_only') {
+    return '<div class="marker-visual">' +
+      '<span class="marker-pill marker-missing">MAT absent</span>' +
+      '<span class="marker-pill marker-pat">Allèle PAT</span>' +
+      '</div>';
+  }
+  if (value === 'non_informative') {
+    return '<div class="marker-visual">' +
+      '<span class="marker-pill marker-mat">MAT = PAT</span>' +
+      '<span class="marker-pill marker-pat">Locus non informatif</span>' +
+      '</div>';
+  }
+  return '<div class="marker-visual"><span class="marker-pill marker-missing">Inconnu</span></div>';
+}
+
 // ─── Lecture des entrées ──────────────────────────────────────────────────────
 
 function readInput() {
@@ -57,6 +101,27 @@ function calculate() {
     var result = AngelmanPW.interpretAngelmanPraderWilli(readInput());
     renderResults(result);
   } catch(e) {
+    errorEl.innerHTML = '<div class="error-box">' + e.message + '</div>';
+    errorEl.className = '';
+  }
+}
+
+function generateExpectedPattern() {
+  clearResults();
+  var errorEl = $('error-area');
+  var reverseEl = $('reverse-results');
+  errorEl.className = 'hidden';
+  errorEl.innerHTML = '';
+
+  try {
+    var diagnosisId = $('reverse-diagnosis').value;
+    var result = AngelmanPW.buildExpectedPatternFromCause(diagnosisId);
+    renderExpectedPattern(result);
+  } catch(e) {
+    if (reverseEl) {
+      reverseEl.className = 'hidden';
+      reverseEl.innerHTML = '';
+    }
     errorEl.innerHTML = '<div class="error-box">' + e.message + '</div>';
     errorEl.className = '';
   }
@@ -149,6 +214,49 @@ function toggleSteps() {
   var hidden = detail.classList.contains('hidden');
   detail.classList.toggle('hidden', !hidden);
   btn.textContent = hidden ? '▲ Masquer les étapes' : '▼ Voir les étapes détaillées';
+}
+
+function renderExpectedPattern(result) {
+  var area = $('reverse-results');
+  if (!area) return;
+
+  var html = '';
+  html += '<div class="reverse-summary">';
+  html += '<div class="diagnosis-name">' + result.diagnosisLabel + '</div>';
+  html += '<div class="step-desc">' + result.summary + '</div>';
+  html += '</div>';
+
+  html += '<div class="reverse-grid">';
+
+  html += '<div class="reverse-box">';
+  html += '<div class="reverse-box-title">Southern blot attendu</div>';
+  html += '<div class="step-desc">' + result.explanationSteps[0] + '</div>';
+  html += renderBandVisualForValue(result.expected.southern);
+  html += '</div>';
+
+  html += '<div class="reverse-box">';
+  html += '<div class="reverse-box-title">Microsatellites — région critique</div>';
+  html += '<div class="step-desc">' + result.explanationSteps[1] + '</div>';
+  html += renderMarkerVisual(result.expected.criticalRegionMicrosatellites);
+  html += '</div>';
+
+  html += '<div class="reverse-box">';
+  html += '<div class="reverse-box-title">Microsatellites — hors région critique</div>';
+  html += '<div class="step-desc">' + result.explanationSteps[2] + '</div>';
+  html += renderMarkerVisual(result.expected.outsideRegionMicrosatellites);
+  html += '</div>';
+
+  html += '<div class="reverse-box">';
+  html += '<div class="reverse-box-title">Raisonnement</div>';
+  html += '<div class="step-desc" style="margin-bottom:.6rem">' + result.explanationSteps[3] + '</div>';
+  html += '<div class="info-box" style="font-size:.85rem">→ ' + result.examTip + '</div>';
+  html += '</div>';
+
+  html += '</div>';
+
+  area.innerHTML = html;
+  area.className = '';
+  area.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function clearResults() {

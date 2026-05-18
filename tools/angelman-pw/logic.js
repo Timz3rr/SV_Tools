@@ -213,6 +213,50 @@ function buildExplanationSteps(input) {
   ];
 }
 
+// ─── Outil inverse : cause → profil attendu ──────────────────────────────────
+
+function getDiagnosisById(id) {
+  for (var i = 0; i < DIAGNOSES.length; i++) {
+    if (DIAGNOSES[i].id === id) return DIAGNOSES[i];
+  }
+  return null;
+}
+
+function buildExpectedPatternFromCause(diagnosisId) {
+  var diagnosis = getDiagnosisById(diagnosisId);
+  if (!diagnosis) {
+    throw new Error('Diagnostic inconnu : ' + diagnosisId);
+  }
+
+  var expected = diagnosis.expected;
+  var southernMeaning = SOUTHERN_LABELS[expected.southern] || expected.southern;
+  var criticalMeaning = MICRO_LABELS[expected.criticalRegionMicrosatellites] || expected.criticalRegionMicrosatellites;
+  var outsideMeaning = MICRO_LABELS[expected.outsideRegionMicrosatellites] || expected.outsideRegionMicrosatellites;
+
+  return {
+    diagnosisId: diagnosis.id,
+    diagnosisLabel: diagnosis.label,
+    syndrome: diagnosis.syndrome,
+    expected: {
+      southern: expected.southern,
+      criticalRegionMicrosatellites: expected.criticalRegionMicrosatellites,
+      outsideRegionMicrosatellites: expected.outsideRegionMicrosatellites,
+    },
+    summary:
+      'Si la cause est "' + diagnosis.label + '", alors le Southern et les microsatellites attendus doivent reproduire ce mécanisme.',
+    explanationSteps: [
+      'Southern attendu : ' + southernMeaning,
+      'Microsatellites dans la région critique : ' + criticalMeaning,
+      'Microsatellites hors région critique : ' + outsideMeaning,
+      diagnosis.explanation,
+    ],
+    examTip:
+      "À l'examen, pars du mécanisme : délétion = perte d'un parent seulement dans la région critique ; " +
+      "UPD = un seul parent partout sur le chromosome 15 ; erreur d'empreinte = Southern anormal mais microsatellites biparentaux ; " +
+      "mutation UBE3A = Southern et microsatellites normaux.",
+  };
+}
+
 // ─── buildWarnings ────────────────────────────────────────────────────────────
 
 function buildWarnings(input, possible, ambiguous) {
@@ -334,6 +378,7 @@ function interpretAngelmanPraderWilli(input) {
 (function(exports) {
   exports.interpretAngelmanPraderWilli = interpretAngelmanPraderWilli;
   exports.evaluateDiagnosis            = evaluateDiagnosis;
+  exports.buildExpectedPatternFromCause = buildExpectedPatternFromCause;
   exports.DIAGNOSES                    = DIAGNOSES;
 })(typeof module !== 'undefined' && module.exports
    ? module.exports

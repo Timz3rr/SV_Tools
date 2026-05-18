@@ -29,6 +29,9 @@
     .band-mat { background: #0d6efd; width: 52px; height: 18px; }
     .band-pat { background: #198754; width: 52px; height: 10px; }
     .band-absent { opacity: .15; }
+    .band-visual.compact { margin:.2rem 0; gap:.8rem; }
+    .band-visual.compact .band-mat,
+    .band-visual.compact .band-pat { width: 64px; }
 
     /* ── Statuts diagnostics ── */
     .status-possible   { background: #d1e7dd; color: #0a3622; font-weight: 700; font-size: .78rem; }
@@ -82,6 +85,57 @@
     details > summary::before { content: "▶  "; font-size: .7rem; }
     details[open] > summary::before { content: "▼  "; }
     details > summary:hover { text-decoration: underline; }
+
+    .reverse-grid {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 1rem;
+      align-items: start;
+    }
+    @media (max-width: 820px) {
+      .reverse-grid { grid-template-columns: 1fr; }
+    }
+    .reverse-box {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: .9rem 1rem;
+    }
+    .reverse-box-title {
+      font-size: .82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--text-muted);
+      margin-bottom: .55rem;
+    }
+    .marker-visual {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .45rem;
+      margin: .35rem 0 .2rem;
+    }
+    .marker-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 78px;
+      padding: .28rem .55rem;
+      border-radius: 999px;
+      font-size: .74rem;
+      font-weight: 700;
+      border: 1px solid transparent;
+    }
+    .marker-mat { background: #dbeafe; color: #1d4ed8; border-color: #93c5fd; }
+    .marker-pat { background: #dcfce7; color: #15803d; border-color: #86efac; }
+    .marker-missing { background: #f8fafc; color: #94a3b8; border-color: #cbd5e1; text-decoration: line-through; }
+    .reverse-summary {
+      border-left: 4px solid var(--accent);
+      padding: .85rem 1rem;
+      background: var(--surface);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      margin-bottom: .8rem;
+    }
   </style>
 </head>
 <body>
@@ -193,6 +247,31 @@
 
   <div id="error-area" class="hidden"></div>
   <div id="results-area" class="hidden"></div>
+
+  <!-- ⑤ Cause -> schéma attendu ─────────────────────────────────────────── -->
+  <div class="card" style="margin-top:1rem">
+    <h2>⑤ Cause → schéma attendu</h2>
+    <p class="text-muted" style="font-size:.85rem;margin-bottom:.75rem">
+      Mode examen inverse : on te donne le mécanisme causal, et tu dois déduire le Southern blot
+      et les microsatellites attendus.
+    </p>
+    <div class="input-group">
+      <label for="reverse-diagnosis">Mécanisme causal donné</label>
+      <select id="reverse-diagnosis" class="wide-select">
+        <option value="angelman_ube3a">Angelman — mutation ponctuelle UBE3A</option>
+        <option value="angelman_upd_pat">Angelman — disomie uniparentale paternelle</option>
+        <option value="angelman_del_mat">Angelman — délétion maternelle</option>
+        <option value="angelman_imprint_mat">Angelman — erreur d'empreinte maternelle</option>
+        <option value="pw_upd_mat">Prader-Willi — disomie uniparentale maternelle</option>
+        <option value="pw_del_pat">Prader-Willi — délétion paternelle</option>
+        <option value="pw_imprint_pat">Prader-Willi — erreur d'empreinte paternelle</option>
+      </select>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="generateExpectedPattern()">▶ Générer le schéma attendu</button>
+    </div>
+    <div id="reverse-results" class="hidden"></div>
+  </div>
 
 </main>
 
