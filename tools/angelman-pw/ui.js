@@ -50,6 +50,119 @@ function renderBandVisualForValue(southernValue) {
     '</div>';
 }
 
+function buildSouthernBandsForRole(southernValue, role) {
+  if (role !== 'child') {
+    return { mat: true, pat: true };
+  }
+
+  if (southernValue === 'mat_absent_pat_only') return { mat: false, pat: true };
+  if (southernValue === 'pat_absent_mat_only') return { mat: true, pat: false };
+  if (southernValue === 'normal') return { mat: true, pat: true };
+  return { mat: false, pat: false };
+}
+
+function renderSouthernSchema(southernValue) {
+  var persons = [
+    { label: 'Pere', x: 120, bands: buildSouthernBandsForRole(southernValue, 'father') },
+    { label: 'Enfant', x: 310, bands: buildSouthernBandsForRole(southernValue, 'child') },
+    { label: 'Mere', x: 500, bands: buildSouthernBandsForRole(southernValue, 'mother') },
+  ];
+
+  var svg = '';
+  svg += '<svg class="exam-schema" viewBox="0 0 620 260" aria-label="Schema Southern blot attendu">';
+  svg += '<rect x="0" y="0" width="620" height="260" fill="#ffffff"/>';
+
+  // Probe map
+  svg += '<line x1="400" y1="34" x2="595" y2="34" stroke="#2563eb" stroke-width="2"/>';
+  svg += '<line x1="440" y1="12" x2="440" y2="34" stroke="#2563eb" stroke-width="2"/>';
+  svg += '<line x1="470" y1="12" x2="470" y2="34" stroke="#2563eb" stroke-width="2"/>';
+  svg += '<line x1="565" y1="12" x2="565" y2="34" stroke="#2563eb" stroke-width="2"/>';
+  svg += '<text x="446" y="10" font-size="10" fill="#111827" transform="rotate(-90 446 10)">XbaI</text>';
+  svg += '<text x="476" y="10" font-size="10" fill="#111827" transform="rotate(-90 476 10)">NotI</text>';
+  svg += '<text x="571" y="10" font-size="10" fill="#111827" transform="rotate(-90 571 10)">XbaI</text>';
+  svg += '<line x1="448" y1="54" x2="468" y2="54" stroke="#ef4444" stroke-width="3"/>';
+  svg += '<text x="452" y="68" font-size="10" fill="#ef4444">sonde</text>';
+
+  svg += '<text x="28" y="96" font-size="11" fill="#6b7280">4,2 kb</text>';
+  svg += '<text x="28" y="164" font-size="11" fill="#6b7280">0,9 kb</text>';
+
+  persons.forEach(function(person) {
+    svg += '<text x="' + person.x + '" y="92" text-anchor="middle" font-size="11" fill="#111827">' + person.label + '</text>';
+    svg += '<line x1="' + person.x + '" y1="110" x2="' + person.x + '" y2="182" stroke="#e5e7eb" stroke-width="1"/>';
+    svg += '<line x1="' + (person.x - 32) + '" y1="98" x2="' + (person.x + 32) + '" y2="98" stroke="' + (person.bands.mat ? '#111827' : '#cbd5e1') + '" stroke-width="' + (person.bands.mat ? '3' : '1.5') + '"/>';
+    svg += '<line x1="' + (person.x - 26) + '" y1="156" x2="' + (person.x + 26) + '" y2="156" stroke="' + (person.bands.pat ? '#111827' : '#cbd5e1') + '" stroke-width="' + (person.bands.pat ? '3' : '1.5') + '"/>';
+  });
+
+  svg += '<text x="62" y="222" font-size="11" fill="#374151">Schema simplifie du Southern attendu</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+function buildMicrosatSchemaData(value, locusName) {
+  var father = locusName === 'critical' ? [22, 54] : [20, 56];
+  var mother = locusName === 'critical' ? [30, 64] : [34, 70];
+  var child;
+
+  if (value === 'maternal_and_paternal') {
+    child = [father[1], mother[1]];
+  } else if (value === 'paternal_only') {
+    child = [father[1]];
+  } else if (value === 'maternal_only') {
+    child = [mother[1]];
+  } else if (value === 'non_informative') {
+    father = [42];
+    mother = [42];
+    child = [42];
+  } else {
+    child = [];
+  }
+
+  return { father: father, mother: mother, child: child };
+}
+
+function renderPeaks(xs, baseX, baseY, scaleX) {
+  return xs.map(function(x) {
+    var px = baseX + (x * scaleX);
+    return '<path d="M ' + (px - 10) + ' ' + baseY + ' Q ' + px + ' ' + (baseY - 34) + ' ' + (px + 10) + ' ' + baseY + '" stroke="#111827" stroke-width="2" fill="none"/>';
+  }).join('');
+}
+
+function renderMicrosatSchema(criticalValue, outsideValue) {
+  var critical = buildMicrosatSchemaData(criticalValue, 'critical');
+  var outside = buildMicrosatSchemaData(outsideValue, 'outside');
+  var rows = [
+    { label: 'Pere', y: 88, key: 'father' },
+    { label: 'Mere', y: 164, key: 'mother' },
+    { label: 'Enfant', y: 240, key: 'child' },
+  ];
+  var scaleX = 2.2;
+  var svg = '';
+  svg += '<svg class="exam-schema" viewBox="0 0 720 300" aria-label="Schema microsatellites attendu">';
+  svg += '<rect x="0" y="0" width="720" height="300" fill="#ffffff"/>';
+  svg += '<text x="230" y="28" text-anchor="middle" font-size="14" fill="#111827">D15S128</text>';
+  svg += '<text x="230" y="44" text-anchor="middle" font-size="11" fill="#6b7280">region critique</text>';
+  svg += '<text x="510" y="28" text-anchor="middle" font-size="14" fill="#111827">D15S165</text>';
+  svg += '<text x="510" y="44" text-anchor="middle" font-size="11" fill="#6b7280">hors region critique</text>';
+
+  rows.forEach(function(row) {
+    svg += '<text x="44" y="' + (row.y - 6) + '" font-size="12" fill="#111827">' + row.label + '</text>';
+    svg += '<line x1="120" y1="' + row.y + '" x2="335" y2="' + row.y + '" stroke="#9ca3af" stroke-width="1.5"/>';
+    svg += '<line x1="400" y1="' + row.y + '" x2="615" y2="' + row.y + '" stroke="#9ca3af" stroke-width="1.5"/>';
+  });
+
+  svg += '<line x1="360" y1="54" x2="360" y2="262" stroke="#e5e7eb" stroke-width="1.5"/>';
+
+  svg += renderPeaks(critical.father, 132, 88, scaleX);
+  svg += renderPeaks(critical.mother, 132, 164, scaleX);
+  svg += renderPeaks(critical.child, 132, 240, scaleX);
+  svg += renderPeaks(outside.father, 412, 88, scaleX);
+  svg += renderPeaks(outside.mother, 412, 164, scaleX);
+  svg += renderPeaks(outside.child, 412, 240, scaleX);
+
+  svg += '</svg>';
+  return svg;
+}
+
 function renderMarkerVisual(value) {
   if (value === 'maternal_and_paternal') {
     return '<div class="marker-visual">' +
@@ -231,22 +344,25 @@ function renderExpectedPattern(result) {
   html += '<div class="reverse-box">';
   html += '<div class="reverse-box-title">Southern blot attendu</div>';
   html += '<div class="step-desc">' + result.explanationSteps[0] + '</div>';
-  html += renderBandVisualForValue(result.expected.southern);
+  html += renderSouthernSchema(result.expected.southern);
+  html += '<div class="schema-caption">Parents affichés comme profils de référence normaux ; le profil enfant reflète le mécanisme causal choisi.</div>';
   html += '</div>';
 
   html += '<div class="reverse-box">';
-  html += '<div class="reverse-box-title">Microsatellites — région critique</div>';
-  html += '<div class="step-desc">' + result.explanationSteps[1] + '</div>';
+  html += '<div class="reverse-box-title">Lecture rapide</div>';
+  html += '<div class="step-desc" style="margin-bottom:.45rem">' + result.explanationSteps[1] + '</div>';
   html += renderMarkerVisual(result.expected.criticalRegionMicrosatellites);
-  html += '</div>';
-
-  html += '<div class="reverse-box">';
-  html += '<div class="reverse-box-title">Microsatellites — hors région critique</div>';
-  html += '<div class="step-desc">' + result.explanationSteps[2] + '</div>';
+  html += '<div class="step-desc" style="margin:.6rem 0 .45rem">' + result.explanationSteps[2] + '</div>';
   html += renderMarkerVisual(result.expected.outsideRegionMicrosatellites);
   html += '</div>';
 
-  html += '<div class="reverse-box">';
+  html += '<div class="reverse-box" style="grid-column:1 / -1">';
+  html += '<div class="reverse-box-title">Schema microsatellites attendu</div>';
+  html += renderMicrosatSchema(result.expected.criticalRegionMicrosatellites, result.expected.outsideRegionMicrosatellites);
+  html += '<div class="schema-caption">Schema illustratif : les positions exactes des pics sont arbitraires, mais la presence ou l\'absence des contributions maternelles et paternelles correspond au mecanisme choisi.</div>';
+  html += '</div>';
+
+  html += '<div class="reverse-box" style="grid-column:1 / -1">';
   html += '<div class="reverse-box-title">Raisonnement</div>';
   html += '<div class="step-desc" style="margin-bottom:.6rem">' + result.explanationSteps[3] + '</div>';
   html += '<div class="info-box" style="font-size:.85rem">→ ' + result.examTip + '</div>';
