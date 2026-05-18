@@ -51,49 +51,62 @@ function renderBandVisualForValue(southernValue) {
 }
 
 function buildSouthernBandsForRole(southernValue, role) {
-  if (role !== 'child') {
-    return { mat: true, pat: true };
-  }
-
-  if (southernValue === 'mat_absent_pat_only') return { mat: false, pat: true };
-  if (southernValue === 'pat_absent_mat_only') return { mat: true, pat: false };
-  if (southernValue === 'normal') return { mat: true, pat: true };
-  return { mat: false, pat: false };
+  var profile = role === 'child' ? southernValue : 'normal';
+  return {
+    xbaI: profile !== 'unknown',
+    mat: profile === 'normal' || profile === 'pat_absent_mat_only',
+    pat: profile === 'normal' || profile === 'mat_absent_pat_only',
+  };
 }
 
 function renderSouthernSchema(southernValue) {
   var persons = [
-    { label: 'Pere', x: 120, bands: buildSouthernBandsForRole(southernValue, 'father') },
-    { label: 'Enfant', x: 310, bands: buildSouthernBandsForRole(southernValue, 'child') },
-    { label: 'Mere', x: 500, bands: buildSouthernBandsForRole(southernValue, 'mother') },
+    { label: 'Pere :', x: 170, bands: buildSouthernBandsForRole(southernValue, 'father') },
+    { label: 'enfant', x: 360, bands: buildSouthernBandsForRole(southernValue, 'child') },
+    { label: 'Mere', x: 550, bands: buildSouthernBandsForRole(southernValue, 'mother') },
   ];
 
   var svg = '';
-  svg += '<svg class="exam-schema" viewBox="0 0 620 260" aria-label="Schema Southern blot attendu">';
-  svg += '<rect x="0" y="0" width="620" height="260" fill="#ffffff"/>';
+  svg += '<svg class="exam-schema" viewBox="0 0 720 380" aria-label="Schema Southern blot attendu">';
+  svg += '<rect x="0" y="0" width="720" height="380" fill="#ffffff"/>';
 
-  // Probe map
-  svg += '<line x1="400" y1="34" x2="595" y2="34" stroke="#2563eb" stroke-width="2"/>';
-  svg += '<line x1="440" y1="12" x2="440" y2="34" stroke="#2563eb" stroke-width="2"/>';
-  svg += '<line x1="470" y1="12" x2="470" y2="34" stroke="#2563eb" stroke-width="2"/>';
-  svg += '<line x1="565" y1="12" x2="565" y2="34" stroke="#2563eb" stroke-width="2"/>';
-  svg += '<text x="446" y="10" font-size="10" fill="#111827" transform="rotate(-90 446 10)">XbaI</text>';
-  svg += '<text x="476" y="10" font-size="10" fill="#111827" transform="rotate(-90 476 10)">NotI</text>';
-  svg += '<text x="571" y="10" font-size="10" fill="#111827" transform="rotate(-90 571 10)">XbaI</text>';
-  svg += '<line x1="448" y1="54" x2="468" y2="54" stroke="#ef4444" stroke-width="3"/>';
-  svg += '<text x="452" y="68" font-size="10" fill="#ef4444">sonde</text>';
+  svg += '<text x="20" y="34" font-size="12" fill="#111827">La sonde s\'hybride au IC (Imprinting Center)</text>';
+  svg += '<text x="20" y="52" font-size="12" fill="#111827">sur le chromosome 15.</text>';
+  svg += '<text x="20" y="78" font-size="12" fill="#111827">L\'ADN genomique a ete digere avec Xba I seulement</text>';
+  svg += '<text x="20" y="96" font-size="12" fill="#111827">et avec Xba I + Not I.</text>';
 
-  svg += '<text x="28" y="96" font-size="11" fill="#6b7280">4,2 kb</text>';
-  svg += '<text x="28" y="164" font-size="11" fill="#6b7280">0,9 kb</text>';
+  svg += '<line x1="512" y1="48" x2="682" y2="48" stroke="#2563eb" stroke-width="2"/>';
+  svg += '<line x1="552" y1="28" x2="552" y2="48" stroke="#2563eb" stroke-width="2"/>';
+  svg += '<line x1="576" y1="28" x2="576" y2="48" stroke="#2563eb" stroke-width="2"/>';
+  svg += '<line x1="662" y1="28" x2="662" y2="48" stroke="#2563eb" stroke-width="2"/>';
+  svg += '<text x="558" y="24" font-size="10" fill="#111827" transform="rotate(-90 558 24)">Xba I</text>';
+  svg += '<text x="582" y="24" font-size="10" fill="#111827" transform="rotate(-90 582 24)">Not I</text>';
+  svg += '<text x="668" y="24" font-size="10" fill="#111827" transform="rotate(-90 668 24)">Xba I</text>';
+  svg += '<line x1="558" y1="66" x2="584" y2="66" stroke="#ef4444" stroke-width="3"/>';
+  svg += '<text x="550" y="84" font-size="10" fill="#ef4444">sonde</text>';
+
+  svg += '<text x="34" y="166" font-size="11" fill="#374151">4,2 kb</text>';
+  svg += '<text x="34" y="280" font-size="11" fill="#374151">0,9 kb</text>';
 
   persons.forEach(function(person) {
-    svg += '<text x="' + person.x + '" y="92" text-anchor="middle" font-size="11" fill="#111827">' + person.label + '</text>';
-    svg += '<line x1="' + person.x + '" y1="110" x2="' + person.x + '" y2="182" stroke="#e5e7eb" stroke-width="1"/>';
-    svg += '<line x1="' + (person.x - 32) + '" y1="98" x2="' + (person.x + 32) + '" y2="98" stroke="' + (person.bands.mat ? '#111827' : '#cbd5e1') + '" stroke-width="' + (person.bands.mat ? '3' : '1.5') + '"/>';
-    svg += '<line x1="' + (person.x - 26) + '" y1="156" x2="' + (person.x + 26) + '" y2="156" stroke="' + (person.bands.pat ? '#111827' : '#cbd5e1') + '" stroke-width="' + (person.bands.pat ? '3' : '1.5') + '"/>';
+    var laneXba = person.x - 34;
+    var laneDouble = person.x + 34;
+    svg += '<text x="' + person.x + '" y="132" text-anchor="middle" font-size="13" fill="#111827">' + person.label + '</text>';
+
+    if (person.bands.xbaI) {
+      svg += '<line x1="' + (laneXba - 24) + '" y1="156" x2="' + (laneXba + 24) + '" y2="156" stroke="#111827" stroke-width="3.2" stroke-linecap="square"/>';
+    }
+    if (person.bands.mat) {
+      svg += '<line x1="' + (laneDouble - 24) + '" y1="156" x2="' + (laneDouble + 24) + '" y2="156" stroke="#111827" stroke-width="2.6" stroke-linecap="square"/>';
+    }
+    if (person.bands.pat) {
+      svg += '<line x1="' + (laneDouble - 24) + '" y1="270" x2="' + (laneDouble + 24) + '" y2="270" stroke="#111827" stroke-width="2.6" stroke-linecap="square"/>';
+    }
   });
 
-  svg += '<text x="62" y="222" font-size="11" fill="#374151">Schema simplifie du Southern attendu</text>';
+  svg += '<text x="102" y="314" font-size="11" fill="#111827">Xba I</text>';
+  svg += '<text x="166" y="314" font-size="11" fill="#111827">Xba I + Not I</text>';
+  svg += '<text x="20" y="348" font-size="11" fill="#6b7280">Le profil enfant varie selon le mecanisme causal choisi ; les parents sont montres comme temoins normaux.</text>';
   svg += '</svg>';
   return svg;
 }
