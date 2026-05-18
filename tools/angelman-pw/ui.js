@@ -59,6 +59,12 @@ function buildSouthernBandsForRole(southernValue, role) {
   };
 }
 
+function renderSouthernBand(cx, cy, width, height, darkness) {
+  return '' +
+    '<rect x="' + (cx - (width / 2)) + '" y="' + (cy - (height / 2)) + '" width="' + width + '" height="' + height + '" rx="2" fill="rgba(15,23,42,' + darkness + ')"/>' +
+    '<rect x="' + (cx - (width / 2) - 2) + '" y="' + (cy - (height / 2) - 1) + '" width="' + (width + 4) + '" height="' + (height + 2) + '" rx="3" fill="rgba(15,23,42,' + (darkness * 0.12) + ')"/>';
+}
+
 function renderSouthernSchema(southernValue) {
   var persons = [
     { label: 'Pere :', x: 170, bands: buildSouthernBandsForRole(southernValue, 'father') },
@@ -87,20 +93,23 @@ function renderSouthernSchema(southernValue) {
 
   svg += '<text x="34" y="166" font-size="11" fill="#374151">4,2 kb</text>';
   svg += '<text x="34" y="280" font-size="11" fill="#374151">0,9 kb</text>';
+  svg += '<rect x="72" y="138" width="560" height="162" rx="4" fill="#fafaf9" stroke="#e7e5e4"/>';
 
   persons.forEach(function(person) {
     var laneXba = person.x - 34;
     var laneDouble = person.x + 34;
     svg += '<text x="' + person.x + '" y="132" text-anchor="middle" font-size="13" fill="#111827">' + person.label + '</text>';
+    svg += '<rect x="' + (laneXba - 18) + '" y="146" width="36" height="140" fill="rgba(148,163,184,0.08)"/>';
+    svg += '<rect x="' + (laneDouble - 18) + '" y="146" width="36" height="140" fill="rgba(148,163,184,0.08)"/>';
 
     if (person.bands.xbaI) {
-      svg += '<line x1="' + (laneXba - 24) + '" y1="156" x2="' + (laneXba + 24) + '" y2="156" stroke="#111827" stroke-width="3.2" stroke-linecap="square"/>';
+      svg += renderSouthernBand(laneXba, 156, 46, 6, 0.92);
     }
     if (person.bands.mat) {
-      svg += '<line x1="' + (laneDouble - 24) + '" y1="156" x2="' + (laneDouble + 24) + '" y2="156" stroke="#111827" stroke-width="2.6" stroke-linecap="square"/>';
+      svg += renderSouthernBand(laneDouble, 156, 46, 5, 0.82);
     }
     if (person.bands.pat) {
-      svg += '<line x1="' + (laneDouble - 24) + '" y1="270" x2="' + (laneDouble + 24) + '" y2="270" stroke="#111827" stroke-width="2.6" stroke-linecap="square"/>';
+      svg += renderSouthernBand(laneDouble, 270, 44, 5, 0.82);
     }
   });
 
@@ -184,8 +193,8 @@ function renderSouthernLegend() {
       'La colonne de gauche correspond a la digestion <strong>Xba I</strong>, celle de droite a la digestion <strong>Xba I + Not I</strong>.' +
     '</div>' +
     '<div class="schema-caption">' +
-      '<strong>Important :</strong> l\'epaisseur et la longueur du trait n\'ont pas de signification biologique ici. ' +
-      'Elles servent seulement a rendre la bande visible. Ce qui compte est surtout <strong>sa presence / absence</strong> et <strong>sa position verticale</strong>.' +
+      '<strong>Comme sur un vrai Southern blot :</strong> l\'intensite d\'une bande peut parfois avoir de l\'importance experimentalement. ' +
+      'Dans ce schema, elle est volontairement <strong>normalisee</strong> pour privilegier la lecture de <strong>la presence / absence</strong>, de <strong>la taille</strong> et du <strong>profil de digestion</strong>.' +
     '</div>';
 }
 
