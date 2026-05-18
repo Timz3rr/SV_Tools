@@ -176,6 +176,31 @@ function renderMicrosatSchema(criticalValue, outsideValue) {
   return svg;
 }
 
+function renderSouthernLegend() {
+  return '' +
+    '<div class="schema-caption" style="margin-top:.55rem">' +
+      '<strong>Comment lire ce Southern :</strong> ' +
+      'la hauteur de la bande correspond a la taille du fragment detecte (<strong>4,2 kb</strong> en haut, <strong>0,9 kb</strong> en bas). ' +
+      'La colonne de gauche correspond a la digestion <strong>Xba I</strong>, celle de droite a la digestion <strong>Xba I + Not I</strong>.' +
+    '</div>' +
+    '<div class="schema-caption">' +
+      '<strong>Important :</strong> l\'epaisseur et la longueur du trait n\'ont pas de signification biologique ici. ' +
+      'Elles servent seulement a rendre la bande visible. Ce qui compte est surtout <strong>sa presence / absence</strong> et <strong>sa position verticale</strong>.' +
+    '</div>';
+}
+
+function renderMicrosatLegend() {
+  return '' +
+    '<div class="schema-caption" style="margin-top:.55rem">' +
+      '<strong>Comment lire les microsatellites :</strong> chaque pic represente un allele detecte. ' +
+      'Sa <strong>position horizontale</strong> correspond a une taille relative d\'allele, ce qui permet de comparer pere, mere et enfant.' +
+    '</div>' +
+    '<div class="schema-caption">' +
+      '<strong>Important :</strong> la <strong>hauteur</strong> et la <strong>largeur</strong> des pics sont ici illustratives. ' +
+      'Elles ne representent pas une quantite exacte d\'ADN. Ce qui compte surtout est le <strong>nombre de pics</strong> et leur <strong>origine maternelle ou paternelle</strong>.' +
+    '</div>';
+}
+
 function renderMarkerVisual(value) {
   if (value === 'maternal_and_paternal') {
     return '<div class="marker-visual">' +
@@ -359,6 +384,7 @@ function renderExpectedPattern(result) {
   html += '<div class="step-desc">' + result.explanationSteps[0] + '</div>';
   html += renderSouthernSchema(result.expected.southern);
   html += '<div class="schema-caption">Parents affichés comme profils de référence normaux ; le profil enfant reflète le mécanisme causal choisi.</div>';
+  html += renderSouthernLegend();
   html += '</div>';
 
   html += '<div class="reverse-box">';
@@ -373,6 +399,7 @@ function renderExpectedPattern(result) {
   html += '<div class="reverse-box-title">Schema microsatellites attendu</div>';
   html += renderMicrosatSchema(result.expected.criticalRegionMicrosatellites, result.expected.outsideRegionMicrosatellites);
   html += '<div class="schema-caption">Schema illustratif : les positions exactes des pics sont arbitraires, mais la presence ou l\'absence des contributions maternelles et paternelles correspond au mecanisme choisi.</div>';
+  html += renderMicrosatLegend();
   html += '</div>';
 
   html += '<div class="reverse-box" style="grid-column:1 / -1">';
