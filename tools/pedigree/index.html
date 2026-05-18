@@ -123,6 +123,70 @@
     .disease-tag { display:inline-flex; align-items:center; gap:.3rem; font-size:.75rem; padding:.1rem .4rem; border-radius:3px; background:var(--surface); border:1px solid var(--border); margin:.15rem; }
     .disease-tag .disease-color-dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
     .builder-json-section { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:.75rem; }
+    .bayes-rework { display:flex; flex-direction:column; gap:.75rem; }
+    .bayes-preset-bar {
+      display:flex;
+      flex-wrap:wrap;
+      gap:.5rem;
+      align-items:center;
+      padding:.65rem .75rem;
+      border:1px solid var(--border);
+      border-radius:8px;
+      background:linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    }
+    .bayes-note { font-size:.82rem; color:var(--text-muted); line-height:1.45; }
+    .bayes-meta { display:flex; flex-wrap:wrap; gap:.4rem; }
+    .bayes-chip {
+      display:inline-flex;
+      align-items:center;
+      gap:.35rem;
+      font-size:.75rem;
+      padding:.2rem .5rem;
+      border:1px solid var(--border);
+      border-radius:999px;
+      background:var(--bg);
+      color:var(--text-muted);
+    }
+    .bayes-answer {
+      border-left:4px solid var(--accent);
+      background:var(--bg);
+      border-radius:8px;
+      padding:.8rem .9rem;
+    }
+    .bayes-answer-title {
+      font-size:.74rem;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.05em;
+      color:var(--text-muted);
+      margin-bottom:.35rem;
+    }
+    .bayes-kpi-grid {
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+      gap:.75rem;
+      margin-top:.75rem;
+    }
+    .bayes-kpi {
+      background:var(--bg);
+      border:1px solid var(--border);
+      border-radius:8px;
+      padding:.75rem;
+    }
+    .bayes-kpi-label {
+      font-size:.74rem;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.05em;
+      color:var(--text-muted);
+      margin-bottom:.35rem;
+    }
+    .bayes-kpi-value {
+      font-size:1.85rem;
+      font-weight:700;
+      color:var(--accent);
+      font-family:"Courier New", monospace;
+    }
   </style>
 </head>
 <body>
@@ -496,24 +560,40 @@
         <!-- Bayes Panel -->
         <div class="builder-json-section" id="bt-panel">
           <div class="builder-section-title">Mise à jour bayésienne (X-lié depuis l'arbre)</div>
-          <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:.4rem">
-            Q6.3 : couple Kevin × Zoé. On considère ici uniquement le daltonisme, après observation d'un premier garçon non daltonien.
-          </div>
-          <div class="builder-form" style="margin-bottom:.5rem">
-            <label style="font-size:.8rem">Mère :</label>
-            <select id="bt-mother" style="width:140px"><option value="">-- Mère --</option></select>
-            <label style="font-size:.8rem">Maladie XL :</label>
-            <select id="bt-disease" style="width:140px"><option value="">-- Maladie XL --</option></select>
-          </div>
-          <div class="builder-form" style="margin-bottom:.5rem">
-            <label style="font-size:.8rem">P(conductrice) a priori :</label>
-            <input id="bt-prior" class="prob-input" placeholder="ex. 1/2" style="width:80px">
-            <label style="font-size:.8rem">Garçons non daltoniens observés :</label>
-            <input id="bt-sons" type="number" min="0" max="20" value="1" style="width:60px">
-          </div>
-          <div class="btn-row">
-            <button class="btn btn-example" onclick="btLoadQ63()">📋 Q6.3 (Zoé)</button>
-            <button class="btn btn-primary" onclick="btCalculate()">▶ Calculer</button>
+          <div class="bayes-rework">
+            <div class="bayes-preset-bar">
+              <label style="font-size:.8rem">Mode :</label>
+              <select id="bt-preset" style="width:220px" onchange="btApplyPreset(this.value)">
+                <option value="q63">Q6.3 — Kevin × Zoé</option>
+                <option value="custom">Personnalisé</option>
+              </select>
+              <button class="btn btn-example" onclick="btApplyPreset(document.getElementById('bt-preset').value)">↺ Charger</button>
+              <button class="btn" onclick="btFillPriorFromTree()">⇢ Prior depuis l'arbre</button>
+            </div>
+
+            <div id="bt-context" class="bayes-note">
+              Chargez un preset ou choisissez une mère + une maladie X-liée.
+            </div>
+
+            <div class="builder-form" style="margin-bottom:.25rem">
+              <label style="font-size:.8rem">Mère :</label>
+              <select id="bt-mother" style="width:160px" onchange="btHandleManualChange('mother')"><option value="">-- Mère --</option></select>
+              <label style="font-size:.8rem">Maladie XL :</label>
+              <select id="bt-disease" style="width:200px" onchange="btHandleManualChange('disease')"><option value="">-- Maladie XL --</option></select>
+            </div>
+
+            <div class="builder-form" style="margin-bottom:.25rem">
+              <label style="font-size:.8rem">P(conductrice) a priori :</label>
+              <input id="bt-prior" class="prob-input" placeholder="ex. 1/2" style="width:90px" oninput="btHandleManualChange('prior')">
+              <label style="font-size:.8rem">Garçons non atteints déjà observés :</label>
+              <input id="bt-sons" type="number" min="0" max="20" value="1" style="width:70px" onchange="btHandleManualChange('sons')">
+            </div>
+
+            <div id="bt-source" class="bayes-meta"></div>
+
+            <div class="btn-row">
+              <button class="btn btn-primary" onclick="btCalculate()">▶ Calculer</button>
+            </div>
           </div>
           <div id="bt-result" style="margin-top:.75rem"></div>
         </div>

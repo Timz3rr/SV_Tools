@@ -731,10 +731,33 @@ function builderReset() {
 
 // ─── Risk Calculator (Builder) ────────────────────────────────────────────────
 
+function _restoreSelectValue(el, value) {
+  if (!el || !value) return;
+  for (var i = 0; i < el.options.length; i++) {
+    if (el.options[i].value === value) {
+      el.value = value;
+      return;
+    }
+  }
+}
+
 function rcRefreshSelects() {
   var state = PedigreeBuilder ? PedigreeBuilder.getState() : null;
   if (!state) return;
   var people = Object.values(state.people);
+  var rcP1 = $('rc-p1');
+  var rcP2 = $('rc-p2');
+  var btMother = $('bt-mother');
+  var rcDA = $('rc-dA');
+  var rcDB = $('rc-dB');
+  var btDisease = $('bt-disease');
+  var selectedRcP1 = rcP1 ? rcP1.value : '';
+  var selectedRcP2 = rcP2 ? rcP2.value : '';
+  var selectedBtMother = btMother ? btMother.value : '';
+  var selectedRcDA = rcDA ? rcDA.value : '';
+  var selectedRcDB = rcDB ? rcDB.value : '';
+  var selectedBtDisease = btDisease ? btDisease.value : '';
+
   var motherOpts = '<option value="">-- Mère --</option>' +
     people.map(function(p) {
       return '<option value="' + p.id + '">' + p.name + '</option>';
@@ -743,10 +766,18 @@ function rcRefreshSelects() {
     people.map(function(p) {
       return '<option value="' + p.id + '">' + p.name + '</option>';
     }).join('');
-  var rcP1 = $('rc-p1'), rcP2 = $('rc-p2'), btMother = $('bt-mother');
-  if (rcP1) rcP1.innerHTML = motherOpts;
-  if (rcP2) rcP2.innerHTML = fatherOpts;
-  if (btMother) btMother.innerHTML = motherOpts;
+  if (rcP1) {
+    rcP1.innerHTML = motherOpts;
+    _restoreSelectValue(rcP1, selectedRcP1);
+  }
+  if (rcP2) {
+    rcP2.innerHTML = fatherOpts;
+    _restoreSelectValue(rcP2, selectedRcP2);
+  }
+  if (btMother) {
+    btMother.innerHTML = motherOpts;
+    _restoreSelectValue(btMother, selectedBtMother);
+  }
 
   var diseases = Object.entries(state.diseases);
   var dOpts = '<option value="">-- Maladie --</option>' +
@@ -757,16 +788,26 @@ function rcRefreshSelects() {
     diseases.map(function(e) {
       return '<option value="' + e[0] + '">' + e[1].name + '</option>';
     }).join('');
-  var rcDA = $('rc-dA'), rcDB = $('rc-dB');
-  if (rcDA) rcDA.innerHTML = dOpts;
-  if (rcDB) rcDB.innerHTML = dOptsOpt;
-
-  var btDisease = $('bt-disease');
+  if (rcDA) {
+    rcDA.innerHTML = dOpts;
+    _restoreSelectValue(rcDA, selectedRcDA);
+  }
+  if (rcDB) {
+    rcDB.innerHTML = dOptsOpt;
+    _restoreSelectValue(rcDB, selectedRcDB);
+  }
   if (btDisease) {
     btDisease.innerHTML = '<option value="">-- Maladie XL --</option>' +
       diseases.filter(function(e) { return e[1].inheritance === 'x_linked_recessive'; })
         .map(function(e) { return '<option value="' + e[0] + '">' + e[1].name + '</option>'; })
         .join('');
+    _restoreSelectValue(btDisease, selectedBtDisease);
+  }
+
+  if ($('bt-preset') && $('bt-preset').value === 'q63' && state.people['Zoe'] && !selectedBtMother) {
+    btApplyPreset('q63');
+  } else if (typeof btRefreshContext === 'function') {
+    btRefreshContext();
   }
 }
 
@@ -917,51 +958,186 @@ function rcRenderResult(result, state, diseases, source) {
 
 // ─── Bayes Panel (Builder) ────────────────────────────────────────────────────
 
-function btLoadQ63() {
+var BT_PRESETS = {
+  q63: {
+    motherId: 'Zoe',
+    diseaseId: 'colorblindness',
+    prior: '1/2',
+    unaffectedSons: 1,
+    context: 'Q6.3 : Kevin × Zoé. On ne tient compte que du daltonisme, après observation d\'un premier garçon non daltonien.',
+    priorSource: 'preset Q6.3',
+    answerLabel: 'P(2e garçon non daltonien)',
+  },
+  custom: {
+    context: 'Mode personnalisé : on met à jour la probabilité que la mère soit conductrice pour une maladie X-liée à partir de garçons non atteints déjà observés.',
+    priorSource: 'saisie manuelle',
+    answerLabel: 'P(prochain fils non atteint)',
+  },
+};
+
+var _btState = {
+  presetId: 'q63',
+  priorSource: BT_PRESETS.q63.priorSource,
+  answerLabel: BT_PRESETS.q63.answerLabel,
+};
+
+function _btSelectedText(id) {
+  var el = $(id);
+  if (!el || el.selectedIndex < 0) return '—';
+  var option = el.options[el.selectedIndex];
+  if (!option || !option.value) return '—';
+  return option.textContent || option.innerText || option.value;
+}
+
+function btRefreshContext() {
+  var presetId = $('bt-preset') ? $('bt-preset').value : (_btState.presetId || 'custom');
+  var preset = BT_PRESETS[presetId] || BT_PRESETS.custom;
+  var contextEl = $('bt-context');
+  var sourceEl = $('bt-source');
+  var priorVal = ($('bt-prior') && $('bt-prior').value.trim()) || '—';
+  var motherLabel = _btSelectedText('bt-mother');
+  var diseaseLabel = _btSelectedText('bt-disease');
+  var note = preset.context;
+
+  if (presetId === 'custom' && motherLabel !== '—') {
+    note += ' Mère sélectionnée : ' + motherLabel + '.';
+  }
+  if (presetId === 'custom' && diseaseLabel !== '—') {
+    note += ' Maladie suivie : ' + diseaseLabel + '.';
+  }
+
+  if (contextEl) contextEl.textContent = note;
+  if (sourceEl) {
+    sourceEl.innerHTML = [
+      '<span class="bayes-chip">Mode : ' + (presetId === 'q63' ? 'Q6.3' : 'personnalisé') + '</span>',
+      motherLabel !== '—' ? '<span class="bayes-chip">Mère : ' + motherLabel + '</span>' : '',
+      diseaseLabel !== '—' ? '<span class="bayes-chip">Maladie : ' + diseaseLabel + '</span>' : '',
+      '<span class="bayes-chip">Prior : ' + priorVal + ' (' + (_btState.priorSource || preset.priorSource) + ')</span>',
+    ].filter(Boolean).join('');
+  }
+}
+
+function btApplyPreset(presetId) {
+  presetId = presetId || 'custom';
+  var preset = BT_PRESETS[presetId] || BT_PRESETS.custom;
   var state = PedigreeBuilder.getState();
-  if (!state.people['Zoe'] || !state.people['Kevin']) {
+
+  if (presetId === 'q63' && (!state.people['Zoe'] || !state.people['Kevin'])) {
     alert('Chargez d\'abord l\'exemple Q6.');
     return;
   }
-  $('bt-mother').value  = 'Zoe';
-  $('bt-disease').value = 'colorblindness';
-  var p   = state.people['Zoe'];
-  var ovCb = p.statusOverrides && p.statusOverrides['colorblindness'];
-  $('bt-prior').value = ovCb ? ovCb.carrierProbability : '1/2';
-  $('bt-sons').value  = '1';
+
+  if ($('bt-preset')) $('bt-preset').value = presetId;
+
+  if (presetId === 'q63') {
+    $('bt-mother').value = preset.motherId;
+    $('bt-disease').value = preset.diseaseId;
+    $('bt-prior').value = preset.prior;
+    $('bt-sons').value = String(preset.unaffectedSons);
+  }
+
+  _btState.presetId = presetId;
+  _btState.priorSource = preset.priorSource;
+  _btState.answerLabel = preset.answerLabel;
   $('bt-result').innerHTML = '';
+  btRefreshContext();
+}
+
+function btLoadQ63() {
+  btApplyPreset('q63');
+}
+
+function btHandleManualChange(field) {
+  if ($('bt-preset') && $('bt-preset').value !== 'custom' && field !== 'sons') {
+    $('bt-preset').value = 'custom';
+    _btState.presetId = 'custom';
+    _btState.answerLabel = BT_PRESETS.custom.answerLabel;
+  }
+  if (field === 'prior') _btState.priorSource = 'saisie manuelle';
+  if (field === 'mother' || field === 'disease') {
+    if (!_btState.priorSource || _btState.priorSource === BT_PRESETS.q63.priorSource) {
+      _btState.priorSource = 'saisie manuelle';
+    }
+  }
+  $('bt-result').innerHTML = '';
+  btRefreshContext();
+}
+
+function btFillPriorFromTree() {
+  try {
+    var state = PedigreeBuilder.getState();
+    var motherId = $('bt-mother').value;
+    var diseaseId = $('bt-disease').value;
+    if (!motherId) throw new Error('Sélectionnez une mère dans le bloc bayésien.');
+    if (!diseaseId) throw new Error('Sélectionnez une maladie X-liée.');
+
+    var person = state.people[motherId];
+    var override = person && person.statusOverrides && person.statusOverrides[diseaseId];
+    if (!override || !override.carrierProbability) {
+      throw new Error('Aucun prior de conductrice disponible depuis l\'arbre pour cette mère et cette maladie.');
+    }
+
+    $('bt-prior').value = override.carrierProbability;
+    if ($('bt-preset')) $('bt-preset').value = 'custom';
+    _btState.presetId = 'custom';
+    _btState.priorSource = 'lu depuis l\'arbre';
+    _btState.answerLabel = BT_PRESETS.custom.answerLabel;
+    $('bt-result').innerHTML = '';
+    btRefreshContext();
+  } catch(e) {
+    alert(e.message);
+  }
 }
 
 function btCalculate() {
   var resultEl = $('bt-result');
   try {
+    var presetId = $('bt-preset') ? $('bt-preset').value : 'custom';
+    var motherId = $('bt-mother').value;
+    var diseaseId = $('bt-disease').value;
     var prior = ($('bt-prior').value || '').trim();
     var nSons = parseInt($('bt-sons').value, 10);
+    if (!motherId)                 throw new Error('Sélectionnez une mère.');
+    if (!diseaseId)                throw new Error('Sélectionnez une maladie X-liée.');
     if (!prior)                    throw new Error('Entrez une probabilité a priori.');
     if (isNaN(nSons) || nSons < 0) throw new Error('Nombre de fils indemnes invalide.');
 
+    if (!_btState.priorSource) _btState.priorSource = 'saisie manuelle';
+    if (!_btState.answerLabel) _btState.answerLabel = BT_PRESETS.custom.answerLabel;
+    btRefreshContext();
+
     var r = PedigreeEngine.bayesXLinkedAfterUnaffectedSons(prior, nSons);
+    var motherLabel = _btSelectedText('bt-mother');
+    var diseaseLabel = _btSelectedText('bt-disease');
+    var answerLabel = _btState.answerLabel || BT_PRESETS.custom.answerLabel;
+    var observationLabel = nSons === 1
+      ? 'après 1 garçon non atteint observé'
+      : 'après ' + nSons + ' garçons non atteints observés';
 
     var html = '';
-    html += '<div class="result-row"><span class="result-label">P(conductrice) a posteriori</span>';
-    html += '<span class="result-value fraction-highlight">' + r.posteriorCarrierProbability + '</span></div>';
-    html += '<div class="result-row"><span class="result-label">P(prochain fils atteint)</span>';
-    html += '<span class="result-value fraction-highlight">' + r.riskNextSonAffected + '</span></div>';
-    html += '<div class="result-row"><span class="result-label">P(prochain fils indemne)</span>';
+    html += '<div class="bayes-answer">';
+    html += '<div class="bayes-answer-title">Réponse</div>';
+    html += '<div class="result-row" style="margin-bottom:.25rem"><span class="result-label">' + answerLabel + '</span>';
     html += '<span class="result-value fraction-highlight">' + r.riskNextSonUnaffected + '</span></div>';
+    html += '<div class="bayes-note">' + observationLabel + ' pour ' + diseaseLabel + ' chez ' + motherLabel + '.</div>';
+    html += '</div>';
+
+    html += '<div class="bayes-kpi-grid">';
+    html += '<div class="bayes-kpi"><div class="bayes-kpi-label">P(conductrice) a posteriori</div><div class="bayes-kpi-value">' + r.posteriorCarrierProbability + '</div></div>';
+    html += '<div class="bayes-kpi"><div class="bayes-kpi-label">P(prochain fils atteint)</div><div class="bayes-kpi-value">' + r.riskNextSonAffected + '</div></div>';
+    html += '<div class="bayes-kpi"><div class="bayes-kpi-label">P(prochain fils non atteint)</div><div class="bayes-kpi-value">' + r.riskNextSonUnaffected + '</div></div>';
+    html += '</div>';
 
     // Evolution table
-    if (nSons >= 1) {
-      html += '<table class="comb-table" style="margin-top:.5rem">';
-      html += '<thead><tr><th>Fils indemnes (n)</th><th>P(conductrice)</th><th>P(fils atteint)</th></tr></thead><tbody>';
-      for (var k = 0; k <= nSons; k++) {
-        var rk = PedigreeEngine.bayesXLinkedAfterUnaffectedSons(prior, k);
-        html += '<tr' + (k === nSons ? ' style="background:var(--highlight)"' : '') + '>';
-        html += '<td>' + k + '</td><td>' + rk.posteriorCarrierProbability + '</td><td>' + rk.riskNextSonAffected + '</td>';
-        html += '</tr>';
-      }
-      html += '</tbody></table>';
+    html += '<table class="comb-table" style="margin-top:.75rem">';
+    html += '<thead><tr><th>Garçons non atteints (n)</th><th>P(conductrice)</th><th>P(prochain fils atteint)</th><th>P(prochain fils non atteint)</th></tr></thead><tbody>';
+    for (var k = 0; k <= nSons; k++) {
+      var rk = PedigreeEngine.bayesXLinkedAfterUnaffectedSons(prior, k);
+      html += '<tr' + (k === nSons ? ' style="background:var(--highlight)"' : '') + '>';
+      html += '<td>' + k + '</td><td>' + rk.posteriorCarrierProbability + '</td><td>' + rk.riskNextSonAffected + '</td><td>' + rk.riskNextSonUnaffected + '</td>';
+      html += '</tr>';
     }
+    html += '</tbody></table>';
 
     if (r.explanationSteps && r.explanationSteps.length) {
       html += '<details style="margin-top:.5rem"><summary style="cursor:pointer;font-size:.8rem;color:var(--text-muted)">▶ Étapes détaillées</summary>';
