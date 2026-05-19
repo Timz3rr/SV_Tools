@@ -201,14 +201,17 @@
     <h2>② Southern blot de méthylation</h2>
     <p class="text-muted" style="font-size:.85rem;margin-bottom:.6rem">
       Bande <strong>4,2 kb</strong> = allèle maternel méthylé (MAT) &nbsp;·&nbsp;
-      Bande <strong>0,9 kb</strong> = allèle paternel non méthylé (PAT)
+      Bande <strong>0,9 kb</strong> = allèle paternel non méthylé (PAT)<br>
+      Une <strong>intensité réduite</strong> de la bande restante peut orienter vers une <strong>délétion</strong>.
     </p>
     <div class="input-group">
       <label for="southern">Résultat observé</label>
       <select id="southern" class="wide-select" onchange="updateBandVisual()">
         <option value="normal">Normal — MAT (4,2 kb) + PAT (0,9 kb) présentes</option>
-        <option value="mat_absent_pat_only">MAT absente — PAT (0,9 kb) seule → profil Angelman</option>
-        <option value="pat_absent_mat_only">PAT absente — MAT (4,2 kb) seule → profil Prader-Willi</option>
+        <option value="mat_absent_pat_only">MAT absente — PAT (0,9 kb) seule, intensité non réduite → Angelman (UPD / empreinte)</option>
+        <option value="mat_absent_pat_only_reduced_intensity">MAT absente — PAT (0,9 kb) seule, intensité réduite (~50 %) → Angelman par délétion maternelle</option>
+        <option value="pat_absent_mat_only">PAT absente — MAT (4,2 kb) seule, intensité non réduite → Prader-Willi (UPD / empreinte)</option>
+        <option value="pat_absent_mat_only_reduced_intensity">PAT absente — MAT (4,2 kb) seule, intensité réduite (~50 %) → Prader-Willi par délétion paternelle</option>
         <option value="unknown">Inconnu / non disponible</option>
       </select>
     </div>

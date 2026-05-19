@@ -7,10 +7,10 @@ function $(id) { return document.getElementById(id); }
 var EXAMPLES = {
   '1': { clinicalSuspicion: 'Angelman',     southern: 'normal',             criticalRegionMicrosatellites: 'maternal_and_paternal', outsideRegionMicrosatellites: 'maternal_and_paternal' },
   '2': { clinicalSuspicion: 'Angelman',     southern: 'mat_absent_pat_only', criticalRegionMicrosatellites: 'paternal_only',          outsideRegionMicrosatellites: 'paternal_only' },
-  '3': { clinicalSuspicion: 'Angelman',     southern: 'mat_absent_pat_only', criticalRegionMicrosatellites: 'paternal_only',          outsideRegionMicrosatellites: 'maternal_and_paternal' },
+  '3': { clinicalSuspicion: 'Angelman',     southern: 'mat_absent_pat_only_reduced_intensity', criticalRegionMicrosatellites: 'paternal_only',          outsideRegionMicrosatellites: 'maternal_and_paternal' },
   '4': { clinicalSuspicion: 'Angelman',     southern: 'mat_absent_pat_only', criticalRegionMicrosatellites: 'maternal_and_paternal',  outsideRegionMicrosatellites: 'maternal_and_paternal' },
   '5': { clinicalSuspicion: 'Prader-Willi', southern: 'pat_absent_mat_only', criticalRegionMicrosatellites: 'maternal_only',          outsideRegionMicrosatellites: 'maternal_only' },
-  '6': { clinicalSuspicion: 'Prader-Willi', southern: 'pat_absent_mat_only', criticalRegionMicrosatellites: 'maternal_only',          outsideRegionMicrosatellites: 'maternal_and_paternal' },
+  '6': { clinicalSuspicion: 'Prader-Willi', southern: 'pat_absent_mat_only_reduced_intensity', criticalRegionMicrosatellites: 'maternal_only',          outsideRegionMicrosatellites: 'maternal_and_paternal' },
   '7': { clinicalSuspicion: 'Prader-Willi', southern: 'pat_absent_mat_only', criticalRegionMicrosatellites: 'maternal_and_paternal',  outsideRegionMicrosatellites: 'maternal_and_paternal' },
   '8': { clinicalSuspicion: 'Angelman',     southern: 'normal',             criticalRegionMicrosatellites: 'non_informative',        outsideRegionMicrosatellites: 'maternal_and_paternal' },
 };
@@ -30,32 +30,43 @@ function loadExample() {
 
 function updateBandVisual() {
   var val = $('southern').value;
-  $('band-mat').classList.toggle('band-absent', val === 'mat_absent_pat_only' || val === 'unknown');
-  $('band-pat').classList.toggle('band-absent', val === 'pat_absent_mat_only' || val === 'unknown');
+  var matAbsent = val === 'mat_absent_pat_only' || val === 'mat_absent_pat_only_reduced_intensity' || val === 'unknown';
+  var patAbsent = val === 'pat_absent_mat_only' || val === 'pat_absent_mat_only_reduced_intensity' || val === 'unknown';
+  var reducedRemaining = val === 'mat_absent_pat_only_reduced_intensity' || val === 'pat_absent_mat_only_reduced_intensity';
+
+  $('band-mat').classList.toggle('band-absent', matAbsent);
+  $('band-pat').classList.toggle('band-absent', patAbsent);
+  $('band-mat').style.opacity = (!matAbsent && reducedRemaining) ? '0.55' : '';
+  $('band-pat').style.opacity = (!patAbsent && reducedRemaining) ? '0.55' : '';
 }
 
 function renderBandVisualForValue(southernValue) {
-  var matAbsent = southernValue === 'mat_absent_pat_only' || southernValue === 'unknown';
-  var patAbsent = southernValue === 'pat_absent_mat_only' || southernValue === 'unknown';
+  var matAbsent = southernValue === 'mat_absent_pat_only' || southernValue === 'mat_absent_pat_only_reduced_intensity' || southernValue === 'unknown';
+  var patAbsent = southernValue === 'pat_absent_mat_only' || southernValue === 'pat_absent_mat_only_reduced_intensity' || southernValue === 'unknown';
+  var reducedRemaining = southernValue === 'mat_absent_pat_only_reduced_intensity' || southernValue === 'pat_absent_mat_only_reduced_intensity';
   return '' +
     '<div class="band-visual compact">' +
       '<div>' +
         '<div class="text-muted" style="font-size:.7rem;margin-bottom:.25rem">4,2 kb</div>' +
-        '<div class="band band-mat' + (matAbsent ? ' band-absent' : '') + '">MAT</div>' +
+        '<div class="band band-mat' + (matAbsent ? ' band-absent' : '') + '"' + (!matAbsent && reducedRemaining ? ' style="opacity:.55"' : '') + '>MAT</div>' +
       '</div>' +
       '<div>' +
         '<div class="text-muted" style="font-size:.7rem;margin-bottom:.25rem">0,9 kb</div>' +
-        '<div class="band band-pat' + (patAbsent ? ' band-absent' : '') + '">PAT</div>' +
+        '<div class="band band-pat' + (patAbsent ? ' band-absent' : '') + '"' + (!patAbsent && reducedRemaining ? ' style="opacity:.55"' : '') + '>PAT</div>' +
       '</div>' +
     '</div>';
 }
 
 function buildSouthernBandsForRole(southernValue, role) {
   var profile = role === 'child' ? southernValue : 'normal';
+  var reduced = profile === 'mat_absent_pat_only_reduced_intensity' || profile === 'pat_absent_mat_only_reduced_intensity';
   return {
     xbaI: profile !== 'unknown',
-    mat: profile === 'normal' || profile === 'pat_absent_mat_only',
-    pat: profile === 'normal' || profile === 'mat_absent_pat_only',
+    xbaIDarkness: reduced ? 0.48 : 0.92,
+    mat: profile === 'normal' || profile === 'pat_absent_mat_only' || profile === 'pat_absent_mat_only_reduced_intensity',
+    matDarkness: reduced ? 0.44 : 0.82,
+    pat: profile === 'normal' || profile === 'mat_absent_pat_only' || profile === 'mat_absent_pat_only_reduced_intensity',
+    patDarkness: reduced ? 0.44 : 0.82,
   };
 }
 
@@ -103,13 +114,13 @@ function renderSouthernSchema(southernValue) {
     svg += '<rect x="' + (laneDouble - 18) + '" y="146" width="36" height="140" fill="rgba(148,163,184,0.08)"/>';
 
     if (person.bands.xbaI) {
-      svg += renderSouthernBand(laneXba, 156, 46, 6, 0.92);
+      svg += renderSouthernBand(laneXba, 156, 46, 6, person.bands.xbaIDarkness);
     }
     if (person.bands.mat) {
-      svg += renderSouthernBand(laneDouble, 156, 46, 5, 0.82);
+      svg += renderSouthernBand(laneDouble, 156, 46, 5, person.bands.matDarkness);
     }
     if (person.bands.pat) {
-      svg += renderSouthernBand(laneDouble, 270, 44, 5, 0.82);
+      svg += renderSouthernBand(laneDouble, 270, 44, 5, person.bands.patDarkness);
     }
   });
 
@@ -194,7 +205,8 @@ function renderSouthernLegend() {
     '</div>' +
     '<div class="schema-caption">' +
       '<strong>Comme sur un vrai Southern blot :</strong> l\'intensite d\'une bande peut parfois avoir de l\'importance experimentalement. ' +
-      'Dans ce schema, elle est volontairement <strong>normalisee</strong> pour privilegier la lecture de <strong>la presence / absence</strong>, de <strong>la taille</strong> et du <strong>profil de digestion</strong>.' +
+      'Ici, une <strong>bande restante plus pale</strong> sert a signaler une <strong>intensite reduite</strong>, utile surtout pour evoquer une deletion. ' +
+      'En dehors de ce point, le schema reste simplifie pour privilegier la lecture de <strong>la presence / absence</strong>, de <strong>la taille</strong> et du <strong>profil de digestion</strong>.' +
     '</div>';
 }
 

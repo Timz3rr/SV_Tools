@@ -42,7 +42,7 @@ var DIAGNOSES = [
       outsideRegionMicrosatellites:   'paternal_only',
     },
     explanation:
-      "Southern : bande MAT absente, méthylation maternelle nulle. " +
+      "Southern : bande MAT absente, méthylation maternelle nulle, sans diminution attendue de l'intensité globale. " +
       "Microsatellites dans la région critique et hors région critique : " +
       "allèles uniquement paternels, pas de contribution maternelle détectable. " +
       "L'enfant possède deux copies paternelles du chromosome 15.",
@@ -54,12 +54,12 @@ var DIAGNOSES = [
     label:     'Angelman - délétion maternelle',
     syndrome:  'Angelman',
     expected: {
-      southern:                       'mat_absent_pat_only',
+      southern:                       'mat_absent_pat_only_reduced_intensity',
       criticalRegionMicrosatellites:  'paternal_only',
       outsideRegionMicrosatellites:   'maternal_and_paternal',
     },
     explanation:
-      "Southern : méthylation maternelle absente. " +
+      "Southern : méthylation maternelle absente avec intensité réduite d'environ 50 % par rapport aux témoins parentaux. " +
       "Microsatellites région critique : pas d'allèle maternel dans la région critique. " +
       "Microsatellites hors région critique : contribution maternelle présente. " +
       "Le chromosome maternel existe, mais sa région critique (15q11-q13) est délétée.",
@@ -76,7 +76,7 @@ var DIAGNOSES = [
       outsideRegionMicrosatellites:   'maternal_and_paternal',
     },
     explanation:
-      "Southern : méthylation maternelle absente, mais microsatellites maternels et paternels " +
+      "Southern : méthylation maternelle absente, sans délétion détectable au Southern, mais microsatellites maternels et paternels " +
       "présents dans la région critique et hors région critique. " +
       "Cela exclut une délétion maternelle et une UPD paternelle. " +
       "Le chromosome maternel est structurellement présent mais porte une empreinte de type paternel.",
@@ -95,7 +95,7 @@ var DIAGNOSES = [
       outsideRegionMicrosatellites:   'maternal_only',
     },
     explanation:
-      "Southern : bande PAT absente, méthylation paternelle nulle. " +
+      "Southern : bande PAT absente, méthylation paternelle nulle, sans diminution attendue de l'intensité globale. " +
       "Microsatellites dans la région critique et hors région critique : " +
       "allèles uniquement maternels, pas de contribution paternelle détectable. " +
       "L'enfant possède deux copies maternelles du chromosome 15.",
@@ -107,12 +107,12 @@ var DIAGNOSES = [
     label:     'Prader-Willi - délétion paternelle',
     syndrome:  'Prader-Willi',
     expected: {
-      southern:                       'pat_absent_mat_only',
+      southern:                       'pat_absent_mat_only_reduced_intensity',
       criticalRegionMicrosatellites:  'maternal_only',
       outsideRegionMicrosatellites:   'maternal_and_paternal',
     },
     explanation:
-      "Southern : méthylation paternelle absente. " +
+      "Southern : méthylation paternelle absente avec intensité réduite d'environ 50 % par rapport aux témoins parentaux. " +
       "Microsatellites région critique : pas d'allèle paternel dans la région critique. " +
       "Microsatellites hors région critique : contribution paternelle présente. " +
       "Le chromosome paternel existe, mais sa région critique (15q11-q13) est délétée.",
@@ -140,7 +140,14 @@ var DIAGNOSES = [
 // ─── Valeurs valides ──────────────────────────────────────────────────────────
 
 var VALID_SUSPICION = ['Angelman', 'Prader-Willi', 'unknown'];
-var VALID_SOUTHERN  = ['normal', 'mat_absent_pat_only', 'pat_absent_mat_only', 'unknown'];
+var VALID_SOUTHERN  = [
+  'normal',
+  'mat_absent_pat_only',
+  'mat_absent_pat_only_reduced_intensity',
+  'pat_absent_mat_only',
+  'pat_absent_mat_only_reduced_intensity',
+  'unknown'
+];
 var VALID_MICRO     = ['maternal_and_paternal', 'paternal_only', 'maternal_only',
                        'non_informative', 'unknown'];
 
@@ -169,6 +176,15 @@ function evaluateDiagnosis(input, diagnosis) {
 
     if (inputVal === 'unknown' || inputVal === 'non_informative') {
       hasUnknown = true;
+    } else if (field === 'southern') {
+      var southernComparison = compareSouthernProfiles(inputVal, expected);
+      if (southernComparison === 'mismatch') {
+        hasMismatch = true;
+        break;
+      }
+      if (southernComparison === 'partial') {
+        hasUnknown = true;
+      }
     } else if (inputVal !== expected) {
       hasMismatch = true;
       break; // inutile de continuer
@@ -180,13 +196,43 @@ function evaluateDiagnosis(input, diagnosis) {
   return 'possible';
 }
 
+function getSouthernCoreProfile(value) {
+  if (value === 'mat_absent_pat_only_reduced_intensity') return 'mat_absent_pat_only';
+  if (value === 'pat_absent_mat_only_reduced_intensity') return 'pat_absent_mat_only';
+  return value;
+}
+
+function isReducedSouthernProfile(value) {
+  return value === 'mat_absent_pat_only_reduced_intensity' ||
+         value === 'pat_absent_mat_only_reduced_intensity';
+}
+
+function compareSouthernProfiles(inputVal, expectedVal) {
+  if (inputVal === expectedVal) return 'match';
+
+  var inputCore = getSouthernCoreProfile(inputVal);
+  var expectedCore = getSouthernCoreProfile(expectedVal);
+
+  if (inputCore !== expectedCore) return 'mismatch';
+
+  // Si l'utilisateur saisit seulement le profil "MAT absente" ou "PAT absente"
+  // sans préciser l'intensité, la délétion reste possible mais non certaine.
+  if (!isReducedSouthernProfile(inputVal) && isReducedSouthernProfile(expectedVal)) {
+    return 'partial';
+  }
+
+  return 'mismatch';
+}
+
 // ─── buildExplanationSteps ────────────────────────────────────────────────────
 
 var SOUTHERN_LABELS = {
-  'normal':              'Normal — bandes MAT (4,2 kb) et PAT (0,9 kb) toutes deux présentes.',
-  'mat_absent_pat_only': 'Bande MAT absente, PAT seule présente → profil compatible Angelman.',
-  'pat_absent_mat_only': 'Bande PAT absente, MAT seule présente → profil compatible Prader-Willi.',
-  'unknown':             'Résultat inconnu ou non disponible.',
+  'normal':                                'Normal — bandes MAT (4,2 kb) et PAT (0,9 kb) toutes deux présentes.',
+  'mat_absent_pat_only':                   'Bande MAT absente, PAT seule présente, intensité non réduite → profil compatible Angelman par UPD paternelle ou erreur d\'empreinte.',
+  'mat_absent_pat_only_reduced_intensity': 'Bande MAT absente, PAT seule présente avec intensité diminuée d\'environ 50 % → profil en faveur d\'une délétion maternelle.',
+  'pat_absent_mat_only':                   'Bande PAT absente, MAT seule présente, intensité non réduite → profil compatible Prader-Willi par UPD maternelle ou erreur d\'empreinte.',
+  'pat_absent_mat_only_reduced_intensity': 'Bande PAT absente, MAT seule présente avec intensité diminuée d\'environ 50 % → profil en faveur d\'une délétion paternelle.',
+  'unknown':                               'Résultat inconnu ou non disponible.',
 };
 
 var MICRO_LABELS = {
@@ -251,7 +297,7 @@ function buildExpectedPatternFromCause(diagnosisId) {
       diagnosis.explanation,
     ],
     examTip:
-      "À l'examen, pars du mécanisme : délétion = perte d'un parent seulement dans la région critique ; " +
+      "À l'examen, pars du mécanisme : délétion = perte d'un parent seulement dans la région critique avec bande restante souvent diminuée d'environ 50 % ; " +
       "UPD = un seul parent partout sur le chromosome 15 ; erreur d'empreinte = Southern anormal mais microsatellites biparentaux ; " +
       "mutation UBE3A = Southern et microsatellites normaux.",
   };
@@ -279,6 +325,18 @@ function buildWarnings(input, possible, ambiguous) {
     warnings.push(
       "Le résultat du Southern blot est manquant. " +
       "Ce test est indispensable pour distinguer les mécanismes — le diagnostic est très limité sans lui."
+    );
+  }
+  if (input.southern === 'mat_absent_pat_only') {
+    warnings.push(
+      "Le Southern montre une perte du signal maternel, mais l'intensité n'a pas été précisée. " +
+      "Une intensité restante proche de 50 % oriente vers une délétion maternelle ; une intensité non réduite oriente plutôt vers une UPD paternelle ou une erreur d'empreinte."
+    );
+  }
+  if (input.southern === 'pat_absent_mat_only') {
+    warnings.push(
+      "Le Southern montre une perte du signal paternel, mais l'intensité n'a pas été précisée. " +
+      "Une intensité restante proche de 50 % oriente vers une délétion paternelle ; une intensité non réduite oriente plutôt vers une UPD maternelle ou une erreur d'empreinte."
     );
   }
   if (possible.length === 0 && ambiguous.length === 0) {
